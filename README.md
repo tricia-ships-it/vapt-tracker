@@ -57,3 +57,16 @@ python build_template.py   # writes VAPT_Report_Template.xlsx
   leave the host.
 - Passwords are hashed with PBKDF2 (via Werkzeug). Serve behind HTTPS on anything
   wider than a trusted internal segment.
+
+## Responsible use
+
+This is a vulnerability-assessment tool. **Only scan systems you own or are
+explicitly authorised to assess.** Scanning networks without permission may be
+illegal in your jurisdiction. The software is provided as-is, with no warranty
+(see `LICENSE`).
+
+## Licence
+
+Released under the [MIT License](LICENSE) — free to use, modify, and deploy in
+your own network. Attribution is welcome. If it's useful to you, a star or a note
+back is appreciated.
