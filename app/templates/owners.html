@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Asset owners · VAPT Tracker{% endblock %}
+{% block body %}
+<h1>Asset owners</h1>
+<p class="lede">Names here appear in the Asset Owner dropdown on every finding.</p>
+
+<div class="panel" style="max-width:560px">
+  <form method="post" class="toolbar" style="margin:0">
+    <input type="text" name="name" placeholder="Add an owner (person or team)…" required style="flex:1">
+    <button class="btn primary" type="submit">Add</button>
+  </form>
+</div>
+
+<div style="max-width:560px">
+  <ul class="owners-list">
+    {% for o in owners %}
+    <li>
+      <span>{{ o.name }}</span>
+      <form method="post" action="{{ url_for('owners_delete', oid=o.id) }}" onsubmit="return confirm('Remove {{ o.name }}?')">
+        <button class="btn sm danger" type="submit">Remove</button>
+      </form>
+    </li>
+    {% else %}
+    <li class="muted">No owners yet.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

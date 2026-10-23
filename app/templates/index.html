@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Findings · VAPT Tracker{% endblock %}
+{% block body %}
+
+<h1>Vulnerability findings</h1>
+<p class="lede">Every finding from this quarter's assessment, with risk rating, target fix date and remediation status tracked automatically.</p>
+
+<div class="stats">
+  <div class="stat"><div class="n">{{ stats.total }}</div><div class="l">Total findings</div></div>
+  <div class="stat crit"><div class="n">{{ stats.critical }}</div><div class="l">Critical</div></div>
+  <div class="stat high"><div class="n">{{ stats.high }}</div><div class="l">High</div></div>
+  <div class="stat"><div class="n">{{ stats.open }}</div><div class="l">Open (not fixed)</div></div>
+  <div class="stat overdue"><div class="n">{{ stats.overdue }}</div><div class="l">Past target date</div></div>
+  <div class="stat breach"><div class="n">{{ stats.breached }}</div><div class="l">Risk tolerance breached</div></div>
+</div>
+
+<form class="toolbar" method="get">
+  <input type="text" name="q" value="{{ q }}" placeholder="Search IP, vulnerability, CVE…">
+  <select name="risk">
+    <option value="">Any actual risk</option>
+    {% for s in severities %}<option value="{{ s }}" {{ 'selected' if risk==s }}>{{ s }}</option>{% endfor %}
+  </select>
+  <select name="status">
+    <option value="">Any status</option>
+    {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status==s }}>{{ s }}</option>{% endfor %}
+  </select>
+  <button class="btn" type="submit">Filter</button>
+  {% if q or risk or status %}<a class="btn ghost" href="{{ url_for('index') }}">Clear</a>{% endif %}
+  <div class="spacer"></div>
+  <a class="btn" href="{{ url_for('export_excel') }}">Export Excel</a>
+  <a class="btn" href="{{ url_for('export_pdf') }}">Export PDF</a>
+</form>
+
+{% if rows %}
+<div class="table-scroll">
+<table class="grid">
+  <thead>
+    <tr>
+      <th>IP / Hostname</th>
+      <th>Asset Classification</th>
+      <th>Vulnerability</th>
+      <th>CVE</th>
+      <th>Reported Risk Rating</th>
+      <th>Exploit Available</th>
+      <th>Actual Risk Classification</th>
+      <th>Detection Date</th>
+      <th>Target Fix Date</th>
+      <th>Time to Fix (Days)</th>
+      <th>Remediation Status</th>
+      <th>Actual Fix Date</th>
+      <th>Risk Tolerance Objective</th>
+      <th>Solution</th>
+      <th>Asset Owner</th>
+      <th>Exception</th>
+      <th>Comment</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr data-id="{{ r.id }}">
+      <td class="ip">{{ r.ip_hostname }}{% if r.device %}<div class="muted mono" style="font-size:11px">{{ r.device }}</div>{% endif %}</td>
+      <td class="nowrap">{% if r.asset_classification %}<span class="risk {{ r.asset_classification }}">{{ r.asset_classification }}</span>{% else %}<span class="muted">set</span>{% endif %}</td>
+      <td class="vuln">{{ r.vulnerability }}
+        {% if r.synopsis %}<div class="muted" style="font-weight:400;font-size:11.5px;margin-top:3px">{{ r.synopsis|truncate(110) }}</div>{% endif %}
+      </td>
+      <td class="cve">{{ r.cve or '—' }}</td>
+      <td class="nowrap">{% if r.reported_risk %}<span class="risk {{ r.reported_risk }}">{{ r.reported_risk }}</span>{% endif %}</td>
+      <td class="mono nowrap">{{ r.exploit_available }}</td>
+      <td class="nowrap"><span class="risk {{ r.actual_risk_classification }}" data-field="actual_risk">{{ r.actual_risk_classification or '—' }}</span></td>
+      <td class="mono nowrap">{{ r.detection_date_disp }}</td>
+      <td class="mono nowrap" data-field="target_fix">{{ r.target_fix_date or '—' }}</td>
+      <td class="mono">{{ r.time_to_fix_days }}</td>
+      <td>
+        {% if r.can_edit %}
+        <select class="statussel" data-id="{{ r.id }}">
+          {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if r.remediation_status==s }}>{{ s }}</option>{% endfor %}
+        </select>
+        {% else %}
+        <span class="mono">{{ r.remediation_status }}</span>
+        {% endif %}
+        {% if r.remediation_status not in ['Fixed','Not Applicable','Risk Accepted','Exception Approved'] and r.target_fix_date_iso and r.target_fix_date_iso < today_iso %}
+          <span class="overdue-flag">past due</span>
+        {% endif %}
+      </td>
+      <td class="mono nowrap" data-field="actual_fix">{{ r.actual_fix_date_disp or '—' }}</td>
+      <td class="nowrap"><span class="rto {{ 'NA' if r.risk_tolerance_objective=='Not Applicable' else r.risk_tolerance_objective }}" data-field="rto">{{ r.risk_tolerance_objective or '—' }}</span></td>
+      <td>{% if r.solution %}<span class="muted" style="font-size:11.5px">{{ r.solution|truncate(90) }}</span>{% else %}—{% endif %}</td>
+      <td class="nowrap">{{ r.asset_owner or '—' }}</td>
+      <td class="nowrap">{% if r.exception_requested == 'Yes' %}<span class="risk Medium">Requested</span>{% if r.revised_target_fix_date_disp %}<div class="muted mono" style="font-size:10.5px;margin-top:3px">→ {{ r.revised_target_fix_date_disp }}</div>{% endif %}{% else %}<span class="muted">No</span>{% endif %}</td>
+      <td>{% if r.comment %}<span class="muted" style="font-size:11.5px">{{ r.comment|truncate(70) }}</span>{% else %}—{% endif %}</td>
+      <td class="nowrap"><a class="btn sm ghost" href="{{ url_for('finding_edit', fid=r.id) }}">Open</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="note">Change a status inline and the Actual Fix Date stamps itself (for Fixed / Not Applicable) and the Risk Tolerance Objective recalculates. Open a finding to edit every field, raise an exception, or add owner comments. The table scrolls sideways to show every column.</p>
+{% else %}
+<div class="empty">
+  <h3>No findings yet</h3>
+  <p>Import a Nessus, OpenVAS or Nmap scan to populate the register, or add a finding by hand.</p>
+  <a class="btn primary" href="{{ url_for('import_scan') }}">Import a scan</a>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+const today_iso = "{{ today_iso }}";
+document.querySelectorAll('select.statussel').forEach(sel => {
+  sel.addEventListener('change', async (e) => {
+    const id = sel.dataset.id;
+    const row = sel.closest('tr');
+    const res = await fetch(`/finding/${id}/status`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({status: sel.value})
+    });
+    if (res.status === 403) { alert("You don't have permission to change this finding."); return; }
+    const data = await res.json();
+    if (data.ok) {
+      const af = row.querySelector('[data-field=actual_fix]');
+      if (af) af.textContent = data.actual_fix_date || '—';
+      const rto = row.querySelector('[data-field=rto]');
+      if (rto) {
+        rto.textContent = data.risk_tolerance_objective || '—';
+        rto.className = 'rto ' + (data.risk_tolerance_objective === 'Not Applicable' ? 'NA' : data.risk_tolerance_objective);
+      }
+    }
+  });
+});
+</script>
+{% endblock %}

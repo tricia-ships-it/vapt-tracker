@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}{{ 'New finding' if is_new else 'Edit finding' }} · VAPT Tracker{% endblock %}
+{% block body %}
+
+<h1>{{ 'Add finding' if is_new else ('Edit finding' if can_edit else 'Finding detail') }}</h1>
+{% if can_edit %}
+<p class="lede">Fields in <span style="color:var(--low)">green</span> are calculated automatically from what you enter — you don't fill them.</p>
+{% else %}
+<p class="lede">You can view this finding and join the discussion below. Editing is done by the security team or the finding's asset owner.</p>
+{% endif %}
+
+<form method="post" {% if not can_edit %}onsubmit="return false"{% endif %}><fieldset {% if not can_edit %}disabled style="border:0;padding:0;margin:0;min-width:0"{% else %}style="border:0;padding:0;margin:0;min-width:0"{% endif %}>
+  {% if not is_new %}
+  <div class="panel">
+    <h2>Calculated</h2>
+    <div class="derived">
+      <div class="d"><div class="k">Actual Risk Classification</div><div class="v"><span class="risk {{ finding.actual_risk_classification }}">{{ finding.actual_risk_classification or '—' }}</span></div></div>
+      <div class="d"><div class="k">Target Fix Date</div><div class="v">{{ finding.target_fix_date or '—' }}</div></div>
+      <div class="d"><div class="k">Time to Fix (days)</div><div class="v">{{ finding.time_to_fix_days if finding.time_to_fix_days != '' else '—' }}</div></div>
+      <div class="d"><div class="k">Risk Tolerance Objective</div><div class="v"><span class="rto {{ 'NA' if finding.risk_tolerance_objective=='Not Applicable' else finding.risk_tolerance_objective }}">{{ finding.risk_tolerance_objective or '—' }}</span></div></div>
+    </div>
+    <p class="note">These update when you save. Actual Risk comes from Asset Classification × Reported Risk × Exploit. Target Fix = Detection + fix window (Critical +30, High +60, Medium +90, Low +120, Information none).</p>
+  </div>
+  {% endif %}
+
+  <div class="panel">
+    <h2>The finding</h2>
+    <div class="form-grid">
+      <div class="field"><label>IP / Hostname</label><input name="ip_hostname" value="{{ finding.ip_hostname or '' }}" required></div>
+      <div class="field"><label>Device</label><input name="device" value="{{ finding.device or '' }}" placeholder="e.g. Unifi Dream Machine"></div>
+      <div class="field full"><label>Vulnerability</label><input name="vulnerability" value="{{ finding.vulnerability or '' }}" required></div>
+      <div class="field full"><label>Synopsis</label><textarea name="synopsis">{{ finding.synopsis or '' }}</textarea></div>
+      <div class="field full"><label>Definition</label><textarea name="definition">{{ finding.definition or '' }}</textarea></div>
+      <div class="field"><label>CVE (if applicable)</label><input name="cve" value="{{ finding.cve or '' }}" placeholder="CVE-2022-3602"></div>
+      <div class="field"><label>Exploit Reference</label><input name="exploit_reference" value="{{ finding.exploit_reference or '' }}"></div>
+      <div class="field full"><label>Risk Statement</label><textarea name="risk_statement">{{ finding.risk_statement or '' }}</textarea></div>
+      <div class="field full"><label>Solution</label><textarea name="solution">{{ finding.solution or '' }}</textarea></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Classification</h2>
+    <p class="subhead">These three drive the Actual Risk Classification.</p>
+    <div class="form-grid">
+      <div class="field">
+        <label>Asset Classification</label>
+        <select name="asset_classification">
+          <option value="">— select —</option>
+          {% for s in severities %}<option value="{{ s }}" {{ 'selected' if finding.asset_classification==s }}>{{ s }}</option>{% endfor %}
+        </select>
+        <span class="hint">How critical is this asset to the business?</span>
+      </div>
+      <div class="field">
+        <label>Reported Risk Rating</label>
+        <select name="reported_risk">
+          <option value="">— select —</option>
+          {% for s in severities %}<option value="{{ s }}" {{ 'selected' if finding.reported_risk==s }}>{{ s }}</option>{% endfor %}
+        </select>
+        <span class="hint">As the scanner rated it (Nessus-style).</span>
+      </div>
+      <div class="field">
+        <label>Exploit Available</label>
+        <select name="exploit_available">
+          {% for s in exploits %}<option value="{{ s }}" {{ 'selected' if finding.exploit_available==s }}>{{ s }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Asset Owner</label>
+        <div style="display:flex;gap:8px">
+          <select name="asset_owner" id="ownersel" style="flex:1">
+            <option value="">— unassigned —</option>
+            {% for o in owners %}<option value="{{ o }}" {{ 'selected' if finding.asset_owner==o }}>{{ o }}</option>{% endfor %}
+          </select>
+          <button type="button" class="btn sm" id="addowner">+ New</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Remediation &amp; tracking</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label>Detection Date</label>
+        <input type="date" name="detection_date" value="{{ finding.detection_date or '' }}">
+        <span class="hint">Day the scan ran. Drives the Target Fix Date.</span>
+      </div>
+      <div class="field">
+        <label>Remediation Status</label>
+        <select name="remediation_status">
+          {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if finding.remediation_status==s }}>{{ s }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Actual Fix Date</label>
+        <input type="date" name="actual_fix_date" value="{{ finding.actual_fix_date or '' }}">
+        <span class="hint">Auto-stamped when you mark Fixed / Not Applicable — editable here.</span>
+      </div>
+      <div class="field">
+        <label>Exception Requested?</label>
+        <select name="exception_requested" id="excsel">
+          <option value="No" {{ 'selected' if finding.exception_requested!='Yes' }}>No</option>
+          <option value="Yes" {{ 'selected' if finding.exception_requested=='Yes' }}>Yes</option>
+        </select>
+      </div>
+      <div class="field exc-detail"><label>Exception Approved By</label><input name="exception_approved_by" value="{{ finding.exception_approved_by or '' }}"></div>
+      <div class="field exc-detail"><label>Revised Target Fix Date</label><input type="date" name="revised_target_fix_date" value="{{ finding.revised_target_fix_date or '' }}"><span class="hint">Risk tolerance is then measured against this date.</span></div>
+      <div class="field full"><label>Asset Owner's Comment</label><textarea name="asset_owners_comment">{{ finding.asset_owners_comment or '' }}</textarea></div>
+      <div class="field full"><label>Comment</label><textarea name="comment">{{ finding.comment or '' }}</textarea></div>
+    </div>
+  </div>
+
+  {% if can_edit %}
+  <div class="form-actions">
+    <button class="btn primary" type="submit">{{ 'Add finding' if is_new else 'Save changes' }}</button>
+    <a class="btn ghost" href="{{ url_for('index') }}">Cancel</a>
+    {% if not is_new %}
+    <div class="spacer" style="flex:1"></div>
+    <button class="btn danger" type="submit" formaction="{{ url_for('finding_delete', fid=finding.id) }}" formnovalidate onclick="return confirm('Delete this finding permanently?')">Delete</button>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="form-actions"><a class="btn ghost" href="{{ url_for('index') }}">Back to findings</a></div>
+  {% endif %}
+  </fieldset>
+</form>
+
+{% if not is_new %}
+<div class="panel" id="discussion">
+  <h2>Discussion</h2>
+  <p class="subhead">Comments are visible to everyone with access and recorded in the activity feed.</p>
+  <div class="discussion">
+    {% for c in comments %}
+    <div class="comment">
+      <div class="avatar">{{ (c.display_name or c.username)[:1]|upper }}</div>
+      <div class="comment-body">
+        <div class="comment-head">
+          <span class="who">{{ c.display_name or c.username }}</span>
+          <span class="badge">{{ role_labels.get(c.role, c.role) }}</span>
+          <span class="when">{{ c.created_at.replace('T',' ')[:16] if c.created_at else '' }}</span>
+        </div>
+        <div class="comment-text">{{ c.body }}</div>
+      </div>
+    </div>
+    {% else %}
+    <div class="comment-empty">No comments yet. Start the discussion below.</div>
+    {% endfor %}
+  </div>
+  <form class="comment-form" method="post" action="{{ url_for('finding_comment', fid=finding.id) }}">
+    <textarea name="body" placeholder="Add a comment — a question, an update, a decision…" required></textarea>
+    <div><button class="btn primary" type="submit">Post comment</button></div>
+  </form>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+// toggle exception detail fields (only present when editable)
+var excsel = document.getElementById('excsel');
+function syncExc() {
+  if (!excsel) return;
+  var show = excsel.value === 'Yes';
+  document.querySelectorAll('.exc-detail').forEach(function(el){ el.style.display = show ? '' : 'none'; });
+}
+if (excsel) { excsel.addEventListener('change', syncExc); syncExc(); }
+
+// add owner inline (only present for editors)
+var addBtn = document.getElementById('addowner');
+if (addBtn) addBtn.addEventListener('click', async () => {
+  const name = prompt('New asset owner name:');
+  if (!name) return;
+  const res = await fetch('/owners/add_ajax', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name})
+  });
+  const data = await res.json();
+  const sel = document.getElementById('ownersel');
+  sel.innerHTML = '<option value="">— unassigned —</option>' +
+    data.owners.map(o => `<option value="${o}">${o}</option>`).join('');
+  sel.value = name.trim();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Activity · VAPT Tracker{% endblock %}
+{% block body %}
+<h1>Activity</h1>
+<p class="lede">Everything that's changed recently — status updates, comments, imports and scans — so you can see what's new since you last looked.</p>
+
+{% macro dot(action) %}
+  {% set colors = {'status':'var(--med)','comment':'var(--info)','import':'var(--low)','scan':'var(--low)','created':'var(--low)','deleted':'var(--crit)','login':'var(--ink-faint)','edited':'var(--ink-dim)'} %}
+  <span class="feed-dot" style="background:{{ colors.get(action,'var(--ink-dim)') }}"></span>
+{% endmacro %}
+
+{% if rows %}
+<div class="feed panel">
+  {% for r in rows %}
+  <div class="feed-item">
+    <span class="feed-when">{{ r.created_at.replace('T',' ')[:16] if r.created_at else '' }}</span>
+    {{ dot(r.action) }}
+    <div class="feed-text">
+      <span class="who">{{ r.display_name or r.username or 'Someone' }}</span>
+      <span class="feed-act act-{{ r.action }}">{{ r.action }}</span>
+      {% if r.detail %}{{ r.detail }}{% endif %}
+      {% if r.finding_id and r.ip_hostname %}
+        — <a href="{{ url_for('finding_edit', fid=r.finding_id) }}">{{ r.ip_hostname }}</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty"><h3>Nothing yet</h3><p>Activity will appear here as the team works through findings.</p></div>
+{% endif %}
+{% endblock %}

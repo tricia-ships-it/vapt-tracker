@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Scanning · VAPT Tracker{% endblock %}
+{% block body %}
+
+<h1>Scanning <span class="mono" style="color:var(--accent)">{{ job.targets|truncate(50) }}</span></h1>
+<p class="lede" id="statusline">Working… this page updates itself.</p>
+
+<div class="panel">
+  <div style="display:flex;gap:18px;margin-bottom:16px">
+    <div><span class="mono" style="font-size:22px" id="hostcount">0</span> <span class="muted">hosts</span></div>
+    <div><span class="mono" style="font-size:22px" id="findcount">0</span> <span class="muted">findings</span></div>
+  </div>
+  <pre id="log" style="background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:14px;max-height:360px;overflow:auto;font-family:var(--mono);font-size:12px;color:var(--ink-dim);line-height:1.6;margin:0"></pre>
+</div>
+
+<div id="done-panel" style="display:none">
+  <div class="panel" style="border-color:#2a3a1f">
+    <h2>Scan complete</h2>
+    <p class="subhead" id="donesummary"></p>
+    <form method="post" id="commitform">
+      <div class="form-actions" style="margin-top:0">
+        <button class="btn primary" type="submit">Add findings to register</button>
+        <a class="btn ghost" href="{{ url_for('scan_page') }}">Run another scan</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const jobId = "{{ job.id }}";
+const log = document.getElementById('log');
+const statusline = document.getElementById('statusline');
+async function poll() {
+  const res = await fetch(`/scan/${jobId}/status`);
+  if (!res.ok) { statusline.textContent = 'Scan not found.'; return; }
+  const d = await res.json();
+  log.textContent = d.progress.join('\n');
+  log.scrollTop = log.scrollHeight;
+  document.getElementById('hostcount').textContent = d.host_count;
+  document.getElementById('findcount').textContent = d.finding_count;
+  if (d.status === 'done' || d.status === 'error') {
+    statusline.textContent = d.status === 'done' ? 'Scan finished.' : 'Scan ended with an error.';
+    if (d.status === 'done') {
+      document.getElementById('done-panel').style.display = 'block';
+      document.getElementById('donesummary').textContent =
+        `${d.finding_count} findings across ${d.host_count} host(s). Review on the next screen after adding.`;
+      document.getElementById('commitform').action = `/scan/${jobId}/commit`;
+    }
+    return;
+  }
+  setTimeout(poll, 1200);
+}
+poll();
+</script>
+{% endblock %}

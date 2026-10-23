@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Run scan · VAPT Tracker{% endblock %}
+{% block body %}
+
+<h1>Run a vulnerability assessment</h1>
+<p class="lede">The built-in scanner probes your targets locally — discovery, open ports, service versions, TLS and HTTP weaknesses, and known-CVE matches. It identifies and reports only; it does not exploit. Penetration testing stays manual.</p>
+
+<form method="post" action="{{ url_for('scan_start') }}">
+  <div class="panel">
+    <h2>Targets</h2>
+    <div class="form-grid">
+      <div class="field full">
+        <label>IP addresses, ranges or CIDR</label>
+        <textarea name="targets" placeholder="10.100.72.3&#10;10.100.72.0/28&#10;10.100.72.1-20" required></textarea>
+        <span class="hint">One or many. Accepts single IPs, 10.0.0.0/24 CIDR, 10.0.0.1-20 ranges, or hostnames — separated by spaces, commas or new lines.</span>
+      </div>
+      <div class="field full">
+        <label>Ports</label>
+        <input name="ports" value="{{ default_ports }}">
+        <span class="hint">Comma-separated. Defaults to common infrastructure services. Clear and type your own to narrow or widen.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Checks &amp; defaults</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label>Detection Date</label>
+        <input type="date" name="detection_date" value="{{ today }}">
+      </div>
+      <div class="field">
+        <label>Default Asset Classification</label>
+        <select name="default_classification">
+          <option value="">— set per asset later —</option>
+          {% for s in severities %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select>
+        <span class="hint">Needed before Actual Risk calculates.</span>
+      </div>
+      <div class="field">
+        <label>Default Asset Owner</label>
+        <select name="default_owner">
+          <option value="">— unassigned —</option>
+          {% for o in owners %}<option value="{{ o }}">{{ o }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Options</label>
+        <div class="checks">
+          <label class="check"><input type="checkbox" name="do_tls" checked> TLS / SSL checks</label>
+          <label class="check"><input type="checkbox" name="do_http" checked> HTTP security-header checks</label>
+          <label class="check"><input type="checkbox" name="assume_up"> Skip liveness probe (hosts that block ping)</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="border-color:#2a3a1f;background:#161d13">
+    <h2 style="color:var(--low)">What this scan does — and doesn't</h2>
+    <ul style="color:var(--ink-dim);font-size:13px;line-height:1.7;margin:0;padding-left:18px">
+      <li><b style="color:var(--ink)">Does:</b> host discovery, TCP port scan, service/version fingerprint, TLS protocol &amp; certificate checks, HTTP security-header review, risky-service flags, and version-to-CVE matching against the local dataset.</li>
+      <li><b style="color:var(--ink)">Doesn't:</b> send exploit payloads, brute-force credentials, or alter targets. It makes the same benign connections any ordinary client would. Real exploitation is done manually by your team.</li>
+      <li><b style="color:var(--ink)">Offline:</b> no internet is used. Only your targets are contacted, from this machine.</li>
+      <li style="color:var(--med)">Only scan systems you are authorised to assess.</li>
+    </ul>
+  </div>
+
+  <div class="form-actions">
+    <button class="btn primary" type="submit">Start scan</button>
+    <a class="btn ghost" href="{{ url_for('index') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

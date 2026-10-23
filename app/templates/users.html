@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Users · VAPT Tracker{% endblock %}
+{% block body %}
+<h1>User accounts</h1>
+<p class="lede">Create accounts for your team. Editors (security team) and admins can change findings; viewers can see everything and comment, and can update findings they own.</p>
+
+<div class="panel">
+  <h2>Add a user</h2>
+  <form method="post" action="{{ url_for('users_add') }}">
+    <div class="form-grid">
+      <div class="field"><label>Username</label><input name="username" required placeholder="e.g. a.mensah"></div>
+      <div class="field"><label>Display name</label><input name="display_name" placeholder="e.g. Ama Mensah"></div>
+      <div class="field"><label>Email (optional)</label><input name="email" type="email"></div>
+      <div class="field"><label>Role</label>
+        <select name="role">
+          {% for r in roles %}<option value="{{ r }}" {{ 'selected' if r=='viewer' }}>{{ role_labels[r] }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label>Initial password</label><input name="password" required>
+        <span class="hint">Share it securely. They'll set their own at first sign-in if you use Reset, or can change it anytime.</span>
+      </div>
+    </div>
+    <div class="form-actions"><button class="btn primary" type="submit">Create account</button></div>
+  </form>
+</div>
+
+<div class="table-scroll">
+<table class="grid" style="min-width:820px">
+  <thead><tr><th>Username</th><th>Display name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for u in users %}
+    <tr class="{{ 'inactive-row' if not u.active }}">
+      <td class="mono">{{ u.username }}</td>
+      <td>{{ u.display_name or '—' }}</td>
+      <td class="muted">{{ u.email or '—' }}</td>
+      <td>
+        <form method="post" action="{{ url_for('users_role', uid=u.id) }}" style="display:flex;gap:6px;align-items:center">
+          <select name="role" class="statussel" onchange="this.form.submit()">
+            {% for r in roles %}<option value="{{ r }}" {{ 'selected' if u.role==r }}>{{ role_labels[r] }}</option>{% endfor %}
+          </select>
+        </form>
+      </td>
+      <td>{% if u.active %}<span class="rto Met">Active</span>{% else %}<span class="muted">Inactive</span>{% endif %}</td>
+      <td class="nowrap">
+        <form method="post" action="{{ url_for('users_active', uid=u.id) }}" style="display:inline">
+          <button class="btn sm ghost" type="submit">{{ 'Deactivate' if u.active else 'Reactivate' }}</button>
+        </form>
+        <form method="post" action="{{ url_for('users_reset', uid=u.id) }}" style="display:inline-flex;gap:4px;align-items:center">
+          <input name="password" placeholder="new password" style="background:var(--panel-2);border:1px solid var(--line);color:var(--ink);padding:4px 7px;border-radius:5px;font-size:12px;width:120px">
+          <button class="btn sm" type="submit">Reset</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="note">Deactivating an account blocks sign-in immediately but keeps that person's past comments and activity. Resetting a password forces them to choose a new one next time they sign in.</p>
+{% endblock %}

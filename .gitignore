@@ -1,0 +1,21 @@
+# Runtime data — never commit
+app/vapt.db
+app/.secret_key
+*.db
+.secret_key
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Build output
+template/*.xlsx

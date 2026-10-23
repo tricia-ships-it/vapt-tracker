@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<nmaprun scanner="nmap" args="nmap -sV --script vuln 10.100.72.30">
+  <host>
+    <address addr="10.100.72.30" addrtype="ipv4"/>
+    <hostnames><hostname name="fileserver" type="user"/></hostnames>
+    <ports>
+      <port protocol="tcp" portid="445">
+        <state state="open"/>
+        <service name="microsoft-ds" product="Samba smbd" version="4.3.11"/>
+        <script id="smb-vuln-ms17-010" output="VULNERABLE: Remote Code Execution (MS17-010) CVE-2017-0143 State: VULNERABLE"/>
+      </port>
+      <port protocol="tcp" portid="80">
+        <state state="open"/>
+        <service name="http" product="Apache httpd" version="2.4.49"/>
+        <script id="http-vuln-cve2021-41773" output="VULNERABLE: Path traversal CVE-2021-41773"/>
+      </port>
+      <port protocol="tcp" portid="3306">
+        <state state="open"/>
+        <service name="mysql" product="MySQL" version="5.5.60"/>
+      </port>
+    </ports>
+    <os><osmatch name="Linux 4.x" accuracy="95"/></os>
+  </host>
+</nmaprun>

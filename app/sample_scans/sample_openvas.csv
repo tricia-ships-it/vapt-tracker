@@ -1,0 +1,3 @@
+IP,Hostname,Port,Port Protocol,CVSS,Severity,Solution Type,NVT Name,Summary,Specific Result,Solution,CVEs,QoD
+10.100.72.20,web01,443,tcp,5.0,Medium,Mitigation,SSL/TLS Weak Ciphers,Weak ciphers accepted,RC4 enabled,Disable weak ciphers,CVE-2013-2566,80
+10.100.72.22,db01,0,tcp,7.5,High,VendorFix,Outdated MySQL,MySQL version is outdated,Version 5.5 detected,Upgrade MySQL,CVE-2021-2000,95

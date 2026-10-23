@@ -1,0 +1,4 @@
+Plugin ID,CVE,CVSS,Risk,Host,Protocol,Port,Name,Synopsis,Description,Solution,See Also,Metasploit
+19506,,0.0,None,10.100.72.10,tcp,0,Nessus Scan Information,Information about the scan.,This plugin displays scan info.,n/a,,
+157288,CVE-2022-3602,9.8,Critical,10.100.72.10,tcp,443,OpenSSL < 3.0.7 RCE,Remote host affected by OpenSSL flaw.,Buffer overflow in OpenSSL punycode decoding.,Upgrade OpenSSL to 3.0.7.,https://openssl.org,true
+51192,CVE-2016-2183,5.3,Medium,10.100.72.12,tcp,3389,SSL/TLS Sweet32,Birthday attack on 64-bit block ciphers.,3DES cipher suites enabled allow Sweet32.,Disable 3DES cipher suites.,,false

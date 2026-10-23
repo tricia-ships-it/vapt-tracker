@@ -1,0 +1,422 @@
+<title>VAPT Tracker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a security-ops instrument — sticky top bar, stat strip, dense findings
+   table, slide-in detail drawer. Dark-slate workspace; the only saturated colour
+   belongs to the risk bands, so severity reads at a glance. */
+:root{
+  --bg:#0f141b; --panel:#171e28; --panel-2:#1d2632; --line:#2a3542; --line-soft:#222c38;
+  --ink:#e7edf4; --ink-dim:#93a1b2; --ink-faint:#5f6e7e; --accent:#4c9aff; --accent-dim:#2d5ca8;
+  --crit:#ff4d5e; --crit-bg:#2b1419; --high:#ff8c42; --high-bg:#2a1b11;
+  --med:#ffc53d; --med-bg:#2a2411; --low:#51cf66; --low-bg:#13241a; --info:#8c9bab; --info-bg:#1a212b;
+  --met:#51cf66; --breach:#ff4d5e; --radius:7px;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  color-scheme:dark;
+}
+/* Single committed dark instrument; still declare the light override so a light
+   host never shows transparent-body bleed. */
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){ color-scheme:dark; }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:40;background:var(--panel);}
+
+/* preview ribbon */
+.ribbon{background:var(--accent-dim);color:#eaf2ff;font-size:12px;padding:7px max(16px,env(safe-area-inset-left,0px));text-align:center;}
+.ribbon b{color:#fff;}
+
+/* top bar */
+.topbar{display:flex;align-items:center;gap:18px;height:54px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:env(safe-area-inset-top,0px);z-index:30;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));}
+.brand{display:flex;align-items:baseline;gap:9px;min-width:0;}
+.brand .mark{font-family:var(--mono);font-weight:600;font-size:15px;letter-spacing:-.3px;white-space:nowrap;}
+.brand .mark b{color:var(--accent);}
+.brand .tag{font-size:11px;color:var(--ink-faint);font-family:var(--mono);}
+.topnav{display:flex;gap:2px;margin-left:auto;}
+.topnav button{background:none;border:0;font-family:var(--sans);padding:7px 12px;border-radius:var(--radius);color:var(--ink-dim);font-size:13px;font-weight:500;cursor:pointer;}
+.topnav button:hover{background:var(--panel-2);color:var(--ink);}
+.topnav button.on{color:var(--ink);background:var(--panel-2);}
+.topnav button.primary{background:var(--accent);color:#0b1017;}
+
+.wrap{padding:20px max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px));max-width:1680px;margin:0 auto;}
+h1{font-size:20px;font-weight:600;margin:0 0 3px;letter-spacing:-.2px;text-wrap:balance;}
+.lede{color:var(--ink-dim);font-size:13px;margin:0 0 18px;}
+
+/* stat strip */
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:18px;}
+@media(max-width:900px){.stats{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:520px){.stats{grid-template-columns:repeat(2,1fr);}}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:13px 15px;}
+.stat .n{font-size:25px;font-weight:600;font-family:var(--mono);line-height:1;font-variant-numeric:tabular-nums;}
+.stat .l{font-size:11px;color:var(--ink-dim);margin-top:6px;}
+.stat.crit .n{color:var(--crit);} .stat.high .n{color:var(--high);}
+.stat.breach .n{color:var(--breach);} .stat.overdue .n{color:var(--high);}
+
+/* toolbar */
+.toolbar{display:flex;gap:9px;align-items:center;margin-bottom:13px;flex-wrap:wrap;}
+.toolbar input,.toolbar select{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);padding:8px 11px;border-radius:var(--radius);font-size:13px;font-family:var(--sans);}
+.toolbar input{min-width:230px;flex:1 1 230px;}
+.toolbar input::placeholder{color:var(--ink-faint);}
+.spacer{flex:1;}
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);padding:8px 13px;border-radius:var(--radius);font-size:13px;font-weight:500;cursor:pointer;font-family:var(--sans);}
+.btn:hover{border-color:var(--accent-dim);}
+.btn.primary{background:var(--accent);color:#0b1017;border-color:var(--accent);}
+.btn.ghost{background:transparent;}
+
+/* table */
+.table-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);}
+table.grid{border-collapse:collapse;width:100%;font-size:12.5px;min-width:1100px;}
+table.grid th{background:var(--panel-2);color:var(--ink-dim);text-align:left;padding:10px 12px;font-weight:600;font-size:11.5px;border-bottom:1px solid var(--line);white-space:nowrap;}
+table.grid td{padding:10px 12px;border-bottom:1px solid var(--line-soft);vertical-align:top;max-width:300px;}
+table.grid tr:hover td{background:#141b24;}
+table.grid tbody tr{cursor:pointer;}
+.ip{font-family:var(--mono);white-space:nowrap;}
+.sub{color:var(--ink-faint);font-family:var(--mono);font-size:11px;}
+.synop{color:var(--ink-faint);font-weight:400;font-size:11.5px;margin-top:3px;}
+.cve{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);}
+.vuln{font-weight:500;}
+.mono{font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;}
+.nowrap{white-space:nowrap;}
+.risk{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--mono);white-space:nowrap;}
+.risk.Critical{color:var(--crit);background:var(--crit-bg);} .risk.High{color:var(--high);background:var(--high-bg);}
+.risk.Medium{color:var(--med);background:var(--med-bg);} .risk.Low{color:var(--low);background:var(--low-bg);}
+.risk.Information{color:var(--info);background:var(--info-bg);}
+.rto.Met{color:var(--met);font-weight:600;} .rto.Breached{color:var(--breach);font-weight:600;} .rto.NA{color:var(--ink-faint);}
+select.statussel{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);padding:5px 8px;border-radius:5px;font-size:12px;font-family:var(--sans);cursor:pointer;max-width:150px;}
+.overdue-flag{color:var(--high);font-family:var(--mono);font-size:10.5px;display:block;margin-top:3px;}
+.note{font-size:12px;color:var(--ink-faint);margin-top:12px;}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(5,8,12,.6);z-index:50;opacity:0;pointer-events:none;transition:opacity .18s;}
+.scrim.open{opacity:1;pointer-events:auto;}
+.drawer{position:fixed;top:0;right:0;height:100%;width:min(560px,94vw);background:var(--panel);border-left:1px solid var(--line);z-index:60;transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);overflow-y:auto;
+  padding-top:env(safe-area-inset-top,0px);padding-right:env(safe-area-inset-right,0px);}
+.drawer.open{transform:translateX(0);}
+.drawer-in{padding:20px;}
+.drawer h2{font-size:16px;margin:0 0 2px;}
+.drawer .dsub{color:var(--ink-dim);font-size:12px;font-family:var(--mono);margin-bottom:16px;}
+.calc{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;}
+.calc .c{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--radius);padding:11px;}
+.calc .c .k{font-size:11px;color:var(--ink-dim);}
+.calc .c .v{font-family:var(--mono);font-size:14px;margin-top:5px;}
+.drow{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-soft);font-size:13px;}
+.drow .dk{color:var(--ink-dim);min-width:150px;flex-shrink:0;}
+.drow .dv{color:var(--ink);min-width:0;word-break:break-word;}
+.closex{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:16px;background:var(--panel-2);border:1px solid var(--line);color:var(--ink-dim);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:16px;line-height:1;}
+.dsel,.dinput{background:var(--panel-2);border:1px solid var(--accent-dim);color:var(--ink);padding:5px 9px;border-radius:5px;font-size:13px;font-family:var(--sans);}
+.dinput{width:100%;}
+#exc-detail{border-left:2px solid var(--accent-dim);padding-left:12px;margin:4px 0 0;}
+.field-note{font-size:11px;color:var(--ink-faint);margin-top:14px;}
+
+/* page panels for non-table views */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
+.panel h2{font-size:15px;margin:0 0 6px;font-weight:600;}
+.panel .ph{font-size:12px;color:var(--ink-dim);margin:0 0 16px;}
+.drop{border:1.5px dashed var(--line);border-radius:var(--radius);padding:30px;text-align:center;color:var(--ink-dim);background:var(--panel-2);}
+.drop .big{font-size:15px;color:var(--ink);margin-bottom:5px;}
+ul.plain{color:var(--ink-dim);font-size:13px;line-height:1.7;margin:0;padding-left:18px;}
+ul.plain b{color:var(--ink);}
+.view{display:none;} .view.on{display:block;}
+.checks{display:flex;flex-direction:column;gap:9px;}
+.check{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink);}
+.check input{accent-color:var(--accent);}
+</style>
+
+<div class="ribbon">Interactive preview of the <b>VAPT Tracker</b> app — real sample findings, working filters and status changes. This runs in your browser; the full app runs offline on your network.</div>
+
+<header class="topbar">
+  <div class="brand"><span class="mark"><b>//</b> VAPT Tracker</span><span class="tag">internal · offline</span></div>
+  <nav class="topnav">
+    <button data-view="findings" class="on">Findings</button>
+    <button data-view="import">Import scan</button>
+    <button data-view="scan" class="primary">Run scan</button>
+  </nav>
+</header>
+
+<main class="wrap">
+  <!-- FINDINGS VIEW -->
+  <section class="view on" id="view-findings">
+    <h1>Vulnerability findings</h1>
+    <p class="lede">Every finding from this quarter's assessment, with risk rating, target fix date and remediation status tracked automatically.</p>
+    <div class="stats" id="stats"></div>
+    <div class="toolbar">
+      <input type="text" id="q" placeholder="Search IP, vulnerability, CVE…">
+      <select id="riskf"><option value="">Any actual risk</option><option>Critical</option><option>High</option><option>Medium</option><option>Low</option><option>Information</option></select>
+      <select id="statusf"><option value="">Any status</option></select>
+      <span class="spacer"></span>
+      <button class="btn">Export Excel</button>
+      <button class="btn">Export PDF</button>
+    </div>
+    <div class="table-scroll">
+      <table class="grid">
+        <thead><tr>
+          <th>IP / Hostname</th><th>Asset Classification</th><th>Vulnerability</th><th>CVE</th><th>Reported Risk Rating</th><th>Exploit Available</th>
+          <th>Actual Risk Classification</th><th>Detection Date</th><th>Target Fix Date</th><th>Time to Fix (Days)</th><th>Remediation Status</th><th>Actual Fix Date</th><th>Risk Tolerance Objective</th><th>Solution</th><th>Asset Owner</th><th>Exception</th><th>Comment</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <p class="note">Change a status inline and the Actual Fix Date stamps itself (Fixed / Not Applicable) and the Risk Tolerance recalculates. Click any row to open the full finding. <b>Try it — it's live.</b></p>
+  </section>
+
+  <!-- IMPORT VIEW -->
+  <section class="view" id="view-import">
+    <h1>Import scan results</h1>
+    <p class="lede">Upload the output from your scan engines. The register fills itself — severity, CVEs, synopsis and solution are read straight from the file.</p>
+    <div class="panel">
+      <h2>Scan file(s)</h2>
+      <p class="ph">Nessus (.nessus or CSV) · OpenVAS / Greenbone (XML or CSV) · Nmap (-oX XML). Several at once.</p>
+      <div class="drop"><div class="big">Drop files here or click to choose</div><div>The format is detected automatically.</div></div>
+    </div>
+    <div class="panel">
+      <h2>How the mapping works</h2>
+      <p class="ph">So you can trust what lands in the register.</p>
+      <ul class="plain">
+        <li><b>Reported Risk Rating</b> comes from the scanner's own severity. You set <b>Asset Classification</b> per host, and Actual Risk is calculated from both plus exploit availability.</li>
+        <li><b>CVEs</b> are extracted from the finding and its description.</li>
+        <li><b>Exploit Available</b> is read from Nessus exploitability flags, otherwise left Unknown to confirm.</li>
+        <li><b>Nmap</b> records every open port as Information (attack-surface inventory) and lifts anything its vuln scripts flag.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- SCAN VIEW -->
+  <section class="view" id="view-scan">
+    <h1>Run a vulnerability assessment</h1>
+    <p class="lede">The built-in scanner probes your targets locally — discovery, open ports, service versions, TLS and HTTP weaknesses, and known-CVE matches. It identifies and reports only; it does not exploit.</p>
+    <div class="panel">
+      <h2>Targets</h2>
+      <p class="ph">One or many. Single IPs, 10.0.0.0/24 CIDR, 10.0.0.1-20 ranges, or hostnames.</p>
+      <div class="drop" style="text-align:left;padding:14px;font-family:var(--mono);color:var(--ink-dim)">10.100.72.3<br>10.100.72.0/28<br>10.100.72.1-20</div>
+    </div>
+    <div class="panel">
+      <h2>Checks</h2>
+      <div class="checks">
+        <label class="check"><input type="checkbox" checked> TLS / SSL checks</label>
+        <label class="check"><input type="checkbox" checked> HTTP security-header checks</label>
+        <label class="check"><input type="checkbox"> Skip liveness probe (hosts that block ping)</label>
+      </div>
+    </div>
+    <div class="panel" style="border-color:#2a3a1f;background:#161d13">
+      <h2 style="color:var(--low)">What this scan does — and doesn't</h2>
+      <ul class="plain">
+        <li><b>Does:</b> host discovery, port scan, service/version fingerprint, TLS &amp; certificate checks, HTTP header review, risky-service flags, version-to-CVE matching.</li>
+        <li><b>Doesn't:</b> send exploit payloads, brute-force credentials, or alter targets. Real exploitation is done manually by your team.</li>
+        <li><b>Offline:</b> no internet is used. Only your targets are contacted, from this machine.</li>
+      </ul>
+    </div>
+    <button class="btn primary">Start scan</button>
+  </section>
+</main>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer"><button class="closex" id="closex">×</button><div class="drawer-in" id="drawer-in"></div></aside>
+
+<script>
+const SEED = [{"id":1,"ip_hostname":"10.100.72.10","device":"Linux Kernel 5.4 on Ubuntu 20.04","asset_classification":"High","vulnerability":"OpenSSL 3.0.x < 3.0.7 Multiple Vulnerabilities","synopsis":"The remote host is affected by multiple vulnerabilities in OpenSSL.","definition":"The version of OpenSSL on the remote host is prior to 3.0.7 and is affected by a buffer overflow (CVE-2022-3602) that could lead to remote code execution.","cve":"CVE-2022-3602, CVE-2022-3786","risk_statement":"","reported_risk":"Critical","exploit_available":"Yes","actual_risk_classification":"Critical","exploit_reference":"true","solution":"Upgrade to OpenSSL 3.0.7 or later.","asset_owner":"Systems Team","detection_date_disp":"Oct 23, 2026","target_fix_date":"Nov 22, 2026","target_fix_date_iso":"2026-11-22","time_to_fix_days":30,"remediation_status":"Fixed","actual_fix_date_disp":"Oct 23, 2026","risk_tolerance_objective":"Met","exception_requested":"No","exception_approved_by":"","revised_target_fix_date_disp":"","asset_owners_comment":"","comment":""},{"id":2,"ip_hostname":"10.100.72.10","device":"Linux Kernel 5.4 on Ubuntu 20.04","asset_classification":"High","vulnerability":"SSH Protocol Versions Supported","synopsis":"The remote service supports older SSH protocol handling.","definition":"Weak key exchange algorithms are enabled on the SSH service.","cve":"","risk_statement":"","reported_risk":"Medium","exploit_available":"Unknown","actual_risk_classification":"High","exploit_reference":"","solution":"Disable weak KEX algorithms in sshd_config.","asset_owner":"Systems Team","detection_date_disp":"Oct 23, 2026","target_fix_date":"Dec 22, 2026","target_fix_date_iso":"2026-12-22","time_to_fix_days":60,"remediation_status":"Pending","actual_fix_date_disp":"","risk_tolerance_objective":"","exception_requested":"No","exception_approved_by":"","revised_target_fix_date_disp":"","asset_owners_comment":"","comment":""},{"id":3,"ip_hostname":"10.100.72.11","device":"Windows Server 2016","asset_classification":"High","vulnerability":"MS17-010 SMBv1 Vulnerability","synopsis":"The remote Windows host is affected by SMBv1 vulnerabilities.","definition":"The remote host is missing the MS17-010 patch (EternalBlue). CVE-2017-0144.","cve":"CVE-2017-0144","risk_statement":"","reported_risk":"High","exploit_available":"Yes","actual_risk_classification":"Critical","exploit_reference":"true","solution":"Apply the MS17-010 security update and disable SMBv1.","asset_owner":"Systems Team","detection_date_disp":"Oct 23, 2026","target_fix_date":"Nov 22, 2026","target_fix_date_iso":"2026-11-22","time_to_fix_days":30,"remediation_status":"In progress","actual_fix_date_disp":"","risk_tolerance_objective":"","exception_requested":"No","exception_approved_by":"","revised_target_fix_date_disp":"","asset_owners_comment":"Confirmed SMBv1 disabled via GPO on 2026-10-22.","comment":"Patch scheduled in next maintenance window; SMBv1 disabled as interim control."},{"id":4,"ip_hostname":"10.100.72.10","device":"","asset_classification":"High","vulnerability":"Nessus Scan Information","synopsis":"Information about the scan.","definition":"This plugin displays scan info.","cve":"","risk_statement":"","reported_risk":"Information","exploit_available":"Unknown","actual_risk_classification":"Low","exploit_reference":"","solution":"n/a","asset_owner":"Systems Team","detection_date_disp":"Oct 23, 2026","target_fix_date":"Feb 20, 2027","target_fix_date_iso":"2027-02-20","time_to_fix_days":120,"remediation_status":"Pending","actual_fix_date_disp":"","risk_tolerance_objective":"","exception_requested":"No","exception_approved_by":"","revised_target_fix_date_disp":"","asset_owners_comment":"","comment":""},{"id":5,"ip_hostname":"10.100.72.10","device":"","asset_classification":"High","vulnerability":"OpenSSL < 3.0.7 RCE","synopsis":"Remote host affected by OpenSSL flaw.","definition":"Buffer overflow in OpenSSL punycode decoding.","cve":"CVE-2022-3602","risk_statement":"","reported_risk":"Critical","exploit_available":"Yes","actual_risk_classification":"Critical","exploit_reference":"https://openssl.org","solution":"Upgrade OpenSSL to 3.0.7.","asset_owner":"Systems Team","detection_date_disp":"Oct 23, 2026","target_fix_date":"Nov 22, 2026","target_fix_date_iso":"2026-11-22","time_to_fix_days":30,"remediation_status":"On hold","actual_fix_date_disp":"","risk_tolerance_objective":"","exception_requested":"No","exception_approved_by":"","revised_target_fix_date_disp":"","asset_owners_comment":"","comment":""},{"id":6,"ip_hostname":"10.100.72.12","device":"","asset_classification":"High","vulnerability":"SSL/TLS Sweet32","synopsis":"Birthday attack on 64-bit block ciphers.","definition":"3DES cipher suites enabled allow Sweet32.","cve":"CVE-2016-2183","risk_statement":"","reported_risk":"Medium","exploit_available":"No","actual_risk_classification":"High","exploit_reference":"","solution":"Disable 3DES cipher suites.","asset_owner":"Systems Team","detection_date_disp":"Oct 23, 2026","target_fix_date":"Dec 22, 2026","target_fix_date_iso":"2026-12-22","time_to_fix_days":60,"remediation_status":"Pending","actual_fix_date_disp":"","risk_tolerance_objective":"","exception_requested":"No","exception_approved_by":"","revised_target_fix_date_disp":"","asset_owners_comment":"","comment":""},{"id":7,"ip_hostname":"10.100.72.30","device":"Linux 4.x","asset_classification":"High","vulnerability":"Open port 445/tcp \u2014 microsoft-ds","synopsis":"Open tcp port 445 running microsoft-ds (Samba smbd 4.3.11)","definition":"Nmap detected this port open during discovery. Recorded as attack-surface inventory; confirm the service is required and hardened.","cve":"","risk_statement":"","reported_risk":"Information","exploit_available":"Unknown","actual_risk_classification":"Low","exploit_reference":"","solution":"Close the port if the service is not required, or restrict access by firewall/segmentation and keep the service patched.","asset_owner":"Systems Team","detection_date_disp":"Oct 23, 2026","target_fix_date":"Feb 20, 2027","target_fix_date_iso":"2027-02-20","time_to_fix_days":120,"remediation_status":"Pending","actual_fix_date_disp":"","risk_tolerance_objective":"","exception_requested":"No","exception_approved_by":"","revised_target_fix_date_disp":"","asset_owners_comment":"","comment":""},{"id":8,"ip_hostname":"10.100.72.30","device":"Linux 4.x","asset_classification":"High","vulnerability":"smb-vuln-ms17-010 on 445/tcp","synopsis":"VULNERABLE: Remote Code Execution (MS17-010) CVE-2017-0143 State: VULNERABLE","definition":"VULNERABLE: Remote Code Execution (MS17-010) CVE-2017-0143 State: VULNERABLE","cve":"CVE-2017-0143","risk_statement":"","reported_risk":"High","exploit_available":"Unknown","actual_risk_classification":"High","exploit_reference":"","solution":"Review the NSE script output and apply the vendor fix for the referenced issue; verify with a focused re-scan.","asset_owner":"Systems Team","detection_date_disp":"Oct 23, 2026","target_fix_date":"Dec 22, 2026","target_fix_date_iso":"2026-12-22","time_to_fix_days":60,"remediation_status":"Pending","actual_fix_date_disp":"","risk_tolerance_objective":"","exception_requested":"No","exception_approved_by":"","revised_target_fix_date_disp":"","asset_owners_comment":"","comment":""},{"id":9,"ip_hostname":"10.100.72.30","device":"Linux 4.x","asset_classification":"High","vulnerability":"Open port 80/tcp \u2014 http","synopsis":"Open tcp port 80 running http (Apache httpd 2.4.49)","definition":"Nmap detected this port open during discovery. Recorded as attack-surface inventory; confirm the service is required and hardened.","cve":"","risk_statement":"","reported_risk":"Information","exploit_available":"Unknown","actual_risk_classification":"Low","exploit_reference":"","solution":"Close the port if the service is not required, or restrict access by firewall/segmentation and keep the service patched.","asset_owner":"Systems Team","detection_date_disp":"Oct 23, 2026","target_fix_date":"Feb 20, 2027","target_fix_date_iso":"2027-02-20","time_to_fix_days":120,"remediation_status":"Pending","actual_fix_date_disp":"","risk_tolerance_objective":"","exception_requested":"No","exception_approved_by":"","revised_target_fix_date_disp":"","asset_owners_comment":"","comment":""},{"id":10,"ip_hostname":"10.100.72.30","device":"Linux 4.x","asset_classification":"High","vulnerability":"http-vuln-cve2021-41773 on 80/tcp","synopsis":"VULNERABLE: Path traversal CVE-2021-41773","definition":"VULNERABLE: Path traversal CVE-2021-41773","cve":"CVE-2021-41773","risk_statement":"","reported_risk":"High","exploit_available":"Unknown","actual_risk_classification":"High","exploit_reference":"","solution":"Review the NSE script output and apply the vendor fix for the referenced issue; verify with a focused re-scan.","asset_owner":"Systems Team","detection_date_disp":"Oct 23, 2026","target_fix_date":"Dec 22, 2026","target_fix_date_iso":"2026-12-22","time_to_fix_days":60,"remediation_status":"Pending","actual_fix_date_disp":"","risk_tolerance_objective":"","exception_requested":"No","exception_approved_by":"","revised_target_fix_date_disp":"","asset_owners_comment":"","comment":""},{"id":11,"ip_hostname":"10.100.72.30","device":"Linux 4.x","asset_classification":"High","vulnerability":"Open port 3306/tcp \u2014 mysql","synopsis":"Open tcp port 3306 running mysql (MySQL 5.5.60)","definition":"Nmap detected this port open during discovery. Recorded as attack-surface inventory; confirm the service is required and hardened.","cve":"","risk_statement":"","reported_risk":"Information","exploit_available":"Unknown","actual_risk_classification":"Low","exploit_reference":"","solution":"Close the port if the service is not required, or restrict access by firewall/segmentation and keep the service patched.","asset_owner":"Systems Team","detection_date_disp":"Oct 23, 2026","target_fix_date":"Feb 20, 2027","target_fix_date_iso":"2027-02-20","time_to_fix_days":120,"remediation_status":"Pending","actual_fix_date_disp":"","risk_tolerance_objective":"","exception_requested":"No","exception_approved_by":"","revised_target_fix_date_disp":"","asset_owners_comment":"","comment":""},{"id":12,"ip_hostname":"10.100.72.20","device":"web01","asset_classification":"High","vulnerability":"SSL/TLS Weak Ciphers","synopsis":"Weak ciphers accepted (QoD: 80%)","definition":"RC4 enabled","cve":"CVE-2013-2566","risk_statement":"","reported_risk":"Medium","exploit_available":"Unknown","actual_risk_classification":"High","exploit_reference":"","solution":"Disable weak ciphers","asset_owner":"Systems Team","detection_date_disp":"Oct 23, 2026","target_fix_date":"Dec 22, 2026","target_fix_date_iso":"2026-12-22","time_to_fix_days":60,"remediation_status":"Pending","actual_fix_date_disp":"","risk_tolerance_objective":"","exception_requested":"No","exception_approved_by":"","revised_target_fix_date_disp":"","asset_owners_comment":"","comment":""},{"id":13,"ip_hostname":"10.100.72.22","device":"db01","asset_classification":"High","vulnerability":"Outdated MySQL","synopsis":"MySQL version is outdated (QoD: 95%)","definition":"Version 5.5 detected","cve":"CVE-2021-2000","risk_statement":"","reported_risk":"High","exploit_available":"Unknown","actual_risk_classification":"High","exploit_reference":"","solution":"Upgrade MySQL","asset_owner":"Systems Team","detection_date_disp":"Oct 23, 2026","target_fix_date":"Dec 22, 2026","target_fix_date_iso":"2026-12-22","time_to_fix_days":60,"remediation_status":"Pending","actual_fix_date_disp":"","risk_tolerance_objective":"","exception_requested":"No","exception_approved_by":"","revised_target_fix_date_disp":"","asset_owners_comment":"","comment":"Vendor upgrade path confirmed; awaiting change approval."},{"id":14,"ip_hostname":"10.100.72.20","device":"","asset_classification":"High","vulnerability":"SSL/TLS: Report Weak Cipher Suites","synopsis":"Weak ciphers accepted (QoD: 80%)","definition":"The host accepts RC4 and 3DES.","cve":"CVE-2013-2566","risk_statement":"","reported_risk":"Medium","exploit_available":"Unknown","actual_risk_classification":"High","exploit_reference":"","solution":"Disable weak ciphers on the server.","asset_owner":"Systems Team","detection_date_disp":"Oct 23, 2026","target_fix_date":"Dec 22, 2026","target_fix_date_iso":"2026-12-22","time_to_fix_days":60,"remediation_status":"Pending","actual_fix_date_disp":"","risk_tolerance_objective":"","exception_requested":"No","exception_approved_by":"","revised_target_fix_date_disp":"","asset_owners_comment":"","comment":""},{"id":15,"ip_hostname":"10.100.72.21","device":"","asset_classification":"High","vulnerability":"Apache HTTP Server End Of Life","synopsis":"Apache 2.2 EOL (QoD: 99%)","definition":"No further security updates will be provided.","cve":"","risk_statement":"","reported_risk":"Critical","exploit_available":"Unknown","actual_risk_classification":"Critical","exploit_reference":"","solution":"Upgrade to a supported Apache version.","asset_owner":"Systems Team","detection_date_disp":"Oct 23, 2026","target_fix_date":"Nov 22, 2026","target_fix_date_iso":"2026-11-22","time_to_fix_days":30,"remediation_status":"Exception Approved","actual_fix_date_disp":"","risk_tolerance_objective":"","exception_requested":"Yes","exception_approved_by":"Head of Infrastructure","revised_target_fix_date_disp":"Jan 31, 2027","asset_owners_comment":"Upgrade bundled with the Q1 platform migration; interim WAF rule in place.","comment":"Exception approved pending migration window."}];
+/* ---- the exact automation rules, mirrored from engine.py ---- */
+const SLA={Critical:30,High:60,Medium:90,Low:120,Information:null};
+const NA_STATUSES=new Set(["Not Applicable","Risk Accepted","Exception Approved"]);
+const CLOSING=new Set(["Fixed","Not Applicable"]);
+const STATUSES=["Pending","Reported","In progress","On hold","Testing","Fixed","Not Applicable","Risk Accepted","Exception Approved"];
+const MATRIX={};
+(function(){const rows=[
+["Critical","Critical","Critical","Critical","Critical"],["Critical","Critical","Critical"],
+];})();
+// Full 60-row matrix (asset|reported|exploit -> actual)
+const M=`Critical|Critical|Yes>Critical,Critical|Critical|No>Critical,Critical|Critical|Unknown>Critical,Critical|High|Yes>Critical,Critical|High|No>Critical,Critical|High|Unknown>Critical,Critical|Medium|Yes>Critical,Critical|Medium|No>High,Critical|Medium|Unknown>High,Critical|Low|Yes>High,Critical|Low|No>Medium,Critical|Low|Unknown>Medium,Critical|Information|Yes>Medium,Critical|Information|No>Low,Critical|Information|Unknown>Low,High|Critical|Yes>Critical,High|Critical|No>Critical,High|Critical|Unknown>Critical,High|High|Yes>Critical,High|High|No>High,High|High|Unknown>High,High|Medium|Yes>Critical,High|Medium|No>High,High|Medium|Unknown>High,High|Low|Yes>High,High|Low|No>Medium,High|Low|Unknown>Medium,High|Information|Yes>Medium,High|Information|No>Low,High|Information|Unknown>Low,Medium|Critical|Yes>Critical,Medium|Critical|No>High,Medium|Critical|Unknown>High,Medium|High|Yes>Critical,Medium|High|No>High,Medium|High|Unknown>High,Medium|Medium|Yes>High,Medium|Medium|No>Medium,Medium|Medium|Unknown>Medium,Medium|Low|Yes>Medium,Medium|Low|No>Low,Medium|Low|Unknown>Low,Medium|Information|Yes>Low,Medium|Information|No>Information,Medium|Information|Unknown>Information,Low|Critical|Yes>High,Low|Critical|No>Medium,Low|Critical|Unknown>Medium,Low|High|Yes>High,Low|High|No>Medium,Low|High|Unknown>Medium,Low|Medium|Yes>Medium,Low|Medium|No>Low,Low|Medium|Unknown>Low,Low|Low|Yes>Low,Low|Low|No>Low,Low|Low|Unknown>Low,Low|Information|Yes>Low,Low|Information|No>Information,Low|Information|Unknown>Information`;
+M.split(",").forEach(p=>{const[k,v]=p.split(">");MATRIX[k]=v;});
+
+function fmt(d){if(!d)return"";return d.toLocaleDateString("en-US",{month:"short",day:"2-digit",year:"numeric"});}
+function parseDisp(s){if(!s)return null;const d=new Date(s);return isNaN(d)?null:d;}
+function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
+
+function recompute(r){
+  const actual=(r.asset_classification&&r.reported_risk&&r.exploit_available)?
+    (MATRIX[[r.asset_classification,r.reported_risk,r.exploit_available].join("|")]||""):"";
+  let tfd=null, ttf="";
+  const det=parseDisp(r.detection_date_disp);
+  if(det&&actual&&SLA[actual]!=null){tfd=addDays(det,SLA[actual]);ttf=SLA[actual];}
+  // RTO
+  let rto="";
+  if(NA_STATUSES.has(r.remediation_status)) rto="Not Applicable";
+  else{
+    const afd=parseDisp(r.actual_fix_date_disp);
+    if(afd){
+      const eff=parseDisp(r.revised_target_fix_date_disp)||tfd;
+      rto=(!eff)?"Met":(afd<=eff?"Met":"Breached");
+    }
+  }
+  r.actual_risk_classification=actual;
+  r.target_fix_date=tfd?fmt(tfd):"";
+  r.target_fix_date_iso=tfd?tfd.toISOString().slice(0,10):"";
+  r.time_to_fix_days=ttf;
+  r.risk_tolerance_objective=rto;
+  return r;
+}
+
+const TODAY="2026-10-23";
+let DATA=SEED.map(recompute);
+
+/* ---- rendering ---- */
+function rtoClass(v){return v==="Not Applicable"?"NA":v;}
+function stat(){
+  const open=DATA.filter(r=>!["Fixed","Not Applicable"].includes(r.remediation_status)).length;
+  const overdue=DATA.filter(r=>!["Fixed","Not Applicable","Risk Accepted","Exception Approved"].includes(r.remediation_status)&&(r.revised_target_fix_date_iso||r.target_fix_date_iso)&&(r.revised_target_fix_date_iso||r.target_fix_date_iso)<TODAY).length;
+  const s=[["total","",DATA.length,"Total findings"],["c","crit",DATA.filter(r=>r.actual_risk_classification==="Critical").length,"Critical"],
+    ["h","high",DATA.filter(r=>r.actual_risk_classification==="High").length,"High"],["o","",open,"Open (not fixed)"],
+    ["ov","overdue",overdue,"Past target date"],["b","breach",DATA.filter(r=>r.risk_tolerance_objective==="Breached").length,"Risk tolerance breached"]];
+  document.getElementById("stats").innerHTML=s.map(x=>`<div class="stat ${x[1]}"><div class="n">${x[2]}</div><div class="l">${x[3]}</div></div>`).join("");
+}
+function esc(s){return(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function trunc(s,n){s=s||"";return s.length>n?s.slice(0,n)+"…":s;}
+
+function rows(){
+  const q=document.getElementById("q").value.toLowerCase();
+  const rf=document.getElementById("riskf").value, sf=document.getElementById("statusf").value;
+  const tb=document.getElementById("tbody"); tb.innerHTML="";
+  DATA.filter(r=>{
+    if(q&&!((r.ip_hostname+r.vulnerability+r.cve).toLowerCase().includes(q)))return false;
+    if(rf&&r.actual_risk_classification!==rf)return false;
+    if(sf&&r.remediation_status!==sf)return false;
+    return true;
+  }).forEach(r=>{
+    const overdue=!["Fixed","Not Applicable","Risk Accepted","Exception Approved"].includes(r.remediation_status)&&r.target_fix_date_iso&&r.target_fix_date_iso<TODAY;
+    const tr=document.createElement("tr"); tr.dataset.id=r.id;
+    const excCell = r.exception_requested==="Yes"
+      ? `<span class="risk Medium">Requested</span>${r.revised_target_fix_date_disp?`<div class="sub" style="margin-top:3px">→ ${esc(r.revised_target_fix_date_disp)}</div>`:""}`
+      : '<span class="sub">No</span>';
+    tr.innerHTML=`
+      <td class="ip">${esc(r.ip_hostname)}${r.device?`<div class="sub">${esc(trunc(r.device,26))}</div>`:""}</td>
+      <td class="nowrap">${r.asset_classification?`<span class="risk ${r.asset_classification}">${r.asset_classification}</span>`:'<span class="sub">set</span>'}</td>
+      <td class="vuln">${esc(r.vulnerability)}${r.synopsis?`<div class="synop">${esc(trunc(r.synopsis,90))}</div>`:""}</td>
+      <td class="cve">${esc(r.cve)||"—"}</td>
+      <td class="nowrap">${r.reported_risk?`<span class="risk ${r.reported_risk}">${r.reported_risk}</span>`:""}</td>
+      <td class="mono nowrap">${esc(r.exploit_available)}</td>
+      <td class="nowrap"><span class="risk ${r.actual_risk_classification}">${r.actual_risk_classification||"—"}</span></td>
+      <td class="mono nowrap">${esc(r.detection_date_disp)}</td>
+      <td class="mono nowrap">${esc(r.target_fix_date)||"—"}</td>
+      <td class="mono">${r.time_to_fix_days}</td>
+      <td data-cell="status"></td>
+      <td class="mono nowrap" data-cell="afd">${esc(r.actual_fix_date_disp)||"—"}</td>
+      <td class="nowrap" data-cell="rto"><span class="rto ${rtoClass(r.risk_tolerance_objective)}">${r.risk_tolerance_objective||"—"}</span></td>
+      <td><span class="synop" style="margin:0">${esc(trunc(r.solution,90))||"—"}</span></td>
+      <td class="nowrap">${esc(r.asset_owner)||"—"}</td>
+      <td class="nowrap" data-cell="exc">${excCell}</td>
+      <td><span class="synop" style="margin:0">${esc(trunc(r.comment,70))||"—"}</span></td>`;
+    // status select
+    const sel=document.createElement("select"); sel.className="statussel";
+    STATUSES.forEach(s=>{const o=document.createElement("option");o.textContent=s;if(s===r.remediation_status)o.selected=true;sel.appendChild(o);});
+    sel.addEventListener("click",e=>e.stopPropagation());
+    sel.addEventListener("change",e=>{e.stopPropagation();onStatus(r,sel.value,tr);});
+    const stc=tr.querySelector('[data-cell="status"]'); stc.appendChild(sel);
+    if(overdue){const f=document.createElement("span");f.className="overdue-flag";f.textContent="past due";stc.appendChild(f);}
+    tr.addEventListener("click",()=>openDrawer(r.id));
+    tb.appendChild(tr);
+  });
+}
+
+function onStatus(r,val,tr){
+  r.remediation_status=val;
+  if(CLOSING.has(val)&&!r.actual_fix_date_disp){ r.actual_fix_date_disp=fmt(new Date(TODAY)); }
+  recompute(r); stat();
+  tr.querySelector('[data-cell="afd"]').textContent=r.actual_fix_date_disp||"—";
+  const rc=tr.querySelector('[data-cell="rto"]');
+  rc.innerHTML=`<span class="rto ${rtoClass(r.risk_tolerance_objective)}">${r.risk_tolerance_objective||"—"}</span>`;
+}
+
+/* ---- drawer ---- */
+function drow(k,v){return v?`<div class="drow"><div class="dk">${k}</div><div class="dv">${esc(v)}</div></div>`:"";}
+function openDrawer(id){
+  const r=DATA.find(x=>x.id===id); if(!r)return;
+  document.getElementById("drawer-in").innerHTML=`
+    <h2>${esc(r.vulnerability)}</h2>
+    <div class="dsub">${esc(r.ip_hostname)}${r.device?" · "+esc(r.device):""}</div>
+    <div class="calc">
+      <div class="c"><div class="k">Actual Risk Classification</div><div class="v"><span class="risk ${r.actual_risk_classification}">${r.actual_risk_classification||"—"}</span></div></div>
+      <div class="c"><div class="k">Target Fix Date</div><div class="v">${esc(r.target_fix_date)||"—"}</div></div>
+      <div class="c"><div class="k">Time to Fix (days)</div><div class="v">${r.time_to_fix_days!==""?r.time_to_fix_days:"—"}</div></div>
+      <div class="c"><div class="k">Risk Tolerance</div><div class="v"><span class="rto ${rtoClass(r.risk_tolerance_objective)}">${r.risk_tolerance_objective||"—"}</span></div></div>
+    </div>
+    ${drow("Asset classification",r.asset_classification)}
+    ${drow("CVE",r.cve)}
+    ${drow("Synopsis",r.synopsis)}
+    ${drow("Definition",r.definition)}
+    ${drow("Risk statement",r.risk_statement)}
+    ${drow("Reported risk rating",r.reported_risk)}
+    ${drow("Exploit available",r.exploit_available)}
+    ${drow("Exploit reference",r.exploit_reference)}
+    ${drow("Solution",r.solution)}
+    ${drow("Asset owner",r.asset_owner)}
+    ${drow("Detection date",r.detection_date_disp)}
+    ${drow("Remediation status",r.remediation_status)}
+    ${drow("Actual fix date",r.actual_fix_date_disp)}
+    <div class="drow"><div class="dk">Exception requested?</div><div class="dv">
+      <select class="dsel" id="excsel">
+        <option value="No"${r.exception_requested!=="Yes"?" selected":""}>No</option>
+        <option value="Yes"${r.exception_requested==="Yes"?" selected":""}>Yes</option>
+      </select>
+    </div></div>
+    <div id="exc-detail">
+      <div class="drow"><div class="dk">Exception approved by</div><div class="dv"><input class="dinput" id="exc-approver" placeholder="e.g. Head of Infrastructure" value="${esc(r.exception_approved_by)}"></div></div>
+      <div class="drow"><div class="dk">Revised target fix date</div><div class="dv"><input class="dinput" type="date" id="exc-revised" value="${r.revised_target_fix_date_iso||""}"></div></div>
+      <p class="field-note" style="margin-top:8px">Risk Tolerance is then measured against this revised date instead of the original Target Fix Date.</p>
+    </div>
+    ${drow("Asset owner's comment",r.asset_owners_comment)}
+    ${drow("Comment",r.comment)}
+    ${drow("Source",r.source_tool)}
+    <p class="field-note">Every field here is editable in the app. Flip <b>Exception requested?</b> above to see the approver and revised-date fields appear or hide — and watch the Risk Tolerance tile at the top recompute.</p>`;
+  // --- interactive exception toggle (mirrors the app's edit form) ---
+  const excsel=document.getElementById("excsel");
+  const excDetail=document.getElementById("exc-detail");
+  const rtoTile=document.querySelector("#drawer-in .calc .c:last-child .v");
+  function syncExc(){
+    const yes=excsel.value==="Yes";
+    excDetail.hidden=!yes;
+    r.exception_requested=yes?"Yes":"No";
+    if(!yes){ r.revised_target_fix_date_disp=""; r.revised_target_fix_date_iso=""; }
+    recompute(r);
+    rtoTile.innerHTML=`<span class="rto ${rtoClass(r.risk_tolerance_objective)}">${r.risk_tolerance_objective||"—"}</span>`;
+    // reflect in the table row too
+    const row=document.querySelector(`#tbody tr[data-id="${r.id}"]`);
+    if(row){
+      const ec=row.querySelector('[data-cell="exc"]');
+      if(ec) ec.innerHTML = yes
+        ? `<span class="risk Medium">Requested</span>${r.revised_target_fix_date_disp?`<div class="sub" style="margin-top:3px">→ ${esc(r.revised_target_fix_date_disp)}</div>`:""}`
+        : '<span class="sub">No</span>';
+      const rc=row.querySelector('[data-cell="rto"]');
+      if(rc) rc.innerHTML=`<span class="rto ${rtoClass(r.risk_tolerance_objective)}">${r.risk_tolerance_objective||"—"}</span>`;
+    }
+  }
+  excsel.addEventListener("change",syncExc);
+  document.getElementById("exc-revised").addEventListener("input",(e)=>{
+    const d=e.target.value?new Date(e.target.value):null;
+    r.revised_target_fix_date_iso=e.target.value||"";
+    r.revised_target_fix_date_disp=d?fmt(d):"";
+    recompute(r);
+    rtoTile.innerHTML=`<span class="rto ${rtoClass(r.risk_tolerance_objective)}">${r.risk_tolerance_objective||"—"}</span>`;
+    const row=document.querySelector(`#tbody tr[data-id="${r.id}"] [data-cell="rto"]`);
+    if(row) row.innerHTML=`<span class="rto ${rtoClass(r.risk_tolerance_objective)}">${r.risk_tolerance_objective||"—"}</span>`;
+  });
+  excDetail.hidden = excsel.value!=="Yes";
+  document.getElementById("scrim").classList.add("open");
+  document.getElementById("drawer").classList.add("open");
+}
+function closeDrawer(){document.getElementById("scrim").classList.remove("open");document.getElementById("drawer").classList.remove("open");}
+
+/* ---- wire up ---- */
+document.getElementById("statusf").innerHTML='<option value="">Any status</option>'+STATUSES.map(s=>`<option>${s}</option>`).join("");
+["q","riskf","statusf"].forEach(id=>document.getElementById(id).addEventListener("input",rows));
+document.getElementById("scrim").addEventListener("click",closeDrawer);
+document.getElementById("closex").addEventListener("click",closeDrawer);
+document.querySelectorAll(".topnav button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".topnav button").forEach(x=>x.classList.toggle("on",x===b&&x.dataset.view!=="scan"));
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"));
+  document.getElementById("view-"+b.dataset.view).classList.add("on");
+  window.scrollTo(0,0);
+}));
+stat(); rows();
+</script>

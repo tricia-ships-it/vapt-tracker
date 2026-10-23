@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Import scan · VAPT Tracker{% endblock %}
+{% block body %}
+
+<h1>Import scan results</h1>
+<p class="lede">Upload the output from your scan engines. The register fills itself — severity, CVEs, synopsis and solution are read straight from the file.</p>
+
+<form method="post" enctype="multipart/form-data">
+  <div class="panel">
+    <h2>Scan file(s)</h2>
+    <p class="subhead">Nessus (<code class="k">.nessus</code> or CSV export) · OpenVAS / Greenbone (XML or CSV) · Nmap (<code class="k">-oX</code> XML). You can select several at once.</p>
+
+    <label class="drop" id="drop">
+      <div class="big">Drop files here or click to choose</div>
+      <div>The format is detected automatically.</div>
+      <input type="file" name="scanfile" id="fileinput" multiple style="display:none" accept=".nessus,.xml,.csv">
+      <div class="filelist" id="filelist"></div>
+    </label>
+  </div>
+
+  <div class="panel">
+    <h2>Defaults for this import</h2>
+    <p class="subhead">Applied to every finding in the file. You can refine each one afterward.</p>
+    <div class="form-grid">
+      <div class="field">
+        <label>Detection Date</label>
+        <input type="date" name="detection_date" value="{{ today }}">
+        <span class="hint">Usually the day the scan ran. Drives every Target Fix Date.</span>
+      </div>
+      <div class="field">
+        <label>Default Asset Classification</label>
+        <select name="default_classification">
+          <option value="">— leave blank, set per asset —</option>
+          {% for s in severities %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select>
+        <span class="hint">Business-criticality of these hosts. Needed before Actual Risk calculates.</span>
+      </div>
+      <div class="field">
+        <label>Default Asset Owner</label>
+        <select name="default_owner">
+          <option value="">— unassigned —</option>
+          {% for o in owners %}<option value="{{ o }}">{{ o }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button class="btn primary" type="submit">Import findings</button>
+    <a class="btn ghost" href="{{ url_for('index') }}">Cancel</a>
+  </div>
+</form>
+
+<div class="panel" style="margin-top:24px">
+  <h2>How the mapping works</h2>
+  <p class="subhead" style="margin-bottom:12px">So you can trust what lands in the register.</p>
+  <ul style="color:var(--ink-dim);font-size:13px;line-height:1.7;margin:0;padding-left:18px">
+    <li><b style="color:var(--ink)">Reported Risk Rating</b> comes from the scanner's own severity (Nessus risk factor / CVSS, OpenVAS threat, Nmap script state). You then set <b style="color:var(--ink)">Asset Classification</b> per host, and the Actual Risk is calculated from both plus exploit availability.</li>
+    <li><b style="color:var(--ink)">CVEs</b> are extracted from the finding and its description.</li>
+    <li><b style="color:var(--ink)">Exploit Available</b> is read from Nessus exploitability flags where present, otherwise left Unknown for you to confirm.</li>
+    <li><b style="color:var(--ink)">Nmap</b> records every open port as an Information finding (your attack-surface inventory) and lifts anything its vuln NSE scripts flag.</li>
+  </ul>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const drop = document.getElementById('drop');
+const input = document.getElementById('fileinput');
+const list = document.getElementById('filelist');
+function show() {
+  list.innerHTML = [...input.files].map(f => '✓ ' + f.name).join('<br>');
+}
+input.addEventListener('change', show);
+['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('hover'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('hover'); }));
+drop.addEventListener('drop', e => { input.files = e.dataTransfer.files; show(); });
+</script>
+{% endblock %}

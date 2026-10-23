@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}VAPT Tracker{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  {% if current_user %}
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark"><b>//</b> VAPT Tracker</span>
+      <span class="tag">internal · offline</span>
+    </div>
+    <nav class="topnav">
+      <a href="{{ url_for('index') }}">Findings</a>
+      <a href="{{ url_for('activity_feed') }}">Activity</a>
+      {% if can_import_or_scan %}
+      <a href="{{ url_for('import_scan') }}">Import scan</a>
+      <a href="{{ url_for('owners') }}">Asset owners</a>
+      {% endif %}
+      {% if is_admin %}<a href="{{ url_for('users') }}">Users</a>{% endif %}
+      {% if can_import_or_scan %}<a href="{{ url_for('finding_new') }}">+ Add finding</a>{% endif %}
+      {% if can_import_or_scan %}<a href="{{ url_for('scan_page') }}" class="primary">Run scan</a>{% endif %}
+    </nav>
+    <div class="usermenu">
+      <span class="uname">{{ current_user.display_name or current_user.username }}</span>
+      <span class="urole">{{ role_labels.get(current_user.role, current_user.role) }}</span>
+      <a href="{{ url_for('change_password') }}" title="Change password" class="umlink">Password</a>
+      <a href="{{ url_for('logout') }}" class="umlink">Sign out</a>
+    </div>
+  </header>
+  {% endif %}
+  <main class="wrap">
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}{% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+    {% block body %}{% endblock %}
+  </main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
