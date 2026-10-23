@@ -58,6 +58,9 @@ python build_template.py   # writes VAPT_Report_Template.xlsx
 - Passwords are hashed with PBKDF2 (via Werkzeug). Serve behind HTTPS on anything
   wider than a trusted internal segment.
 
+See [`SECURITY.md`](SECURITY.md) for the security controls built in (auth, CSRF,
+headers, input hardening) and the operational hardening to apply when deploying.
+
 ## Responsible use
 
 This is a vulnerability-assessment tool. **Only scan systems you own or are

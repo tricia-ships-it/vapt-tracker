@@ -15,6 +15,7 @@
         {% if messages %}{% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}{% endif %}
       {% endwith %}
       <form method="post">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <div class="login-field">
           <label for="username">Username</label>
           <input id="username" name="username" value="{{ username }}" autofocus autocomplete="username" required>

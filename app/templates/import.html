@@ -5,7 +5,7 @@
 <h1>Import scan results</h1>
 <p class="lede">Upload the output from your scan engines. The register fills itself — severity, CVEs, synopsis and solution are read straight from the file.</p>
 
-<form method="post" enctype="multipart/form-data">
+<form method="post" enctype="multipart/form-data"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
   <div class="panel">
     <h2>Scan file(s)</h2>
     <p class="subhead">Nessus (<code class="k">.nessus</code> or CSV export) · OpenVAS / Greenbone (XML or CSV) · Nmap (<code class="k">-oX</code> XML). You can select several at once.</p>

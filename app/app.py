@@ -20,7 +20,7 @@ from datetime import date, datetime
 
 from flask import (
     Flask, g, render_template, request, redirect, url_for,
-    jsonify, send_file, abort, flash,
+    jsonify, send_file, abort, flash, session,
 )
 
 import engine
@@ -38,6 +38,67 @@ app = Flask(__name__)
 app.secret_key = auth.load_or_create_secret(APP_DIR)
 app.permanent_session_lifetime = timedelta(hours=12)
 auth.register_db_getter(lambda: get_db())
+
+# --- session cookie hardening -------------------------------------------------
+# HttpOnly keeps the cookie out of JS; SameSite=Lax blocks it on cross-site POSTs
+# (a strong CSRF mitigation on its own); Secure is enabled when serving over
+# HTTPS — set VAPT_HTTPS=1 behind a TLS reverse proxy.
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.environ.get("VAPT_HTTPS", "") in ("1", "true", "yes"),
+    MAX_CONTENT_LENGTH=64 * 1024 * 1024,  # cap uploads at 64 MB
+)
+
+import secrets as _secrets
+
+# --- CSRF protection ----------------------------------------------------------
+# Session-bound token, required on every state-changing (non-GET) request.
+# SameSite=Lax already blocks cross-site form POSTs; this token defends the
+# JSON/fetch endpoints and gives defence-in-depth against same-site attacks.
+CSRF_EXEMPT = set()  # none currently
+
+
+def csrf_token():
+    tok = session.get("_csrf")
+    if not tok:
+        tok = _secrets.token_urlsafe(32)
+        session["_csrf"] = tok
+    return tok
+
+
+@app.before_request
+def _csrf_protect():
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return
+    if request.endpoint in CSRF_EXEMPT:
+        return
+    sent = (request.form.get("_csrf")
+            or request.headers.get("X-CSRF-Token")
+            or (request.get_json(silent=True) or {}).get("_csrf"))
+    if not sent or sent != session.get("_csrf"):
+        abort(400, description="Invalid or missing CSRF token. Reload the page and try again.")
+
+
+@app.after_request
+def _security_headers(resp):
+    # The same headers the scanner flags when missing on a host — set them here.
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("X-Frame-Options", "DENY")
+    resp.headers.setdefault("Referrer-Policy", "no-referrer")
+    # Self-only CSP: the UI uses only same-origin assets and inline scripts.
+    resp.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+        "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    )
+    return resp
+
+
+@app.context_processor
+def _inject_csrf():
+    return {"csrf_token": csrf_token}
 
 # ---------------------------------------------------------------------------
 # Database
@@ -188,21 +249,50 @@ def owner_list():
 # ---------------------------------------------------------------------------
 # Routes: authentication
 # ---------------------------------------------------------------------------
+# Simple in-memory login throttle: lock an IP for a spell after repeated misses.
+_LOGIN_FAILS = {}  # ip -> [count, first_ts]
+_LOGIN_MAX = 8
+_LOGIN_WINDOW = 300  # seconds
+
+
+def _safe_next(target):
+    """Allow only same-site relative paths, never absolute/scheme-relative URLs."""
+    if not target:
+        return None
+    if target.startswith("//") or "://" in target or "\\" in target:
+        return None
+    if not target.startswith("/"):
+        return None
+    return target
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     db = get_db()
     if request.method == "POST":
+        import time as _t
+        ip = request.remote_addr or "?"
+        rec = _LOGIN_FAILS.get(ip)
+        if rec and rec[0] >= _LOGIN_MAX and (_t.time() - rec[1]) < _LOGIN_WINDOW:
+            flash("Too many failed attempts. Wait a few minutes and try again.")
+            return render_template("login.html", username="")
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         u = auth.verify_login(db, username, password)
         if not u:
+            r = _LOGIN_FAILS.get(ip)
+            if not r or (_t.time() - r[1]) >= _LOGIN_WINDOW:
+                _LOGIN_FAILS[ip] = [1, _t.time()]
+            else:
+                r[0] += 1
             flash("Incorrect username or password, or the account is inactive.")
             return render_template("login.html", username=username)
+        _LOGIN_FAILS.pop(ip, None)
         auth.login_user(u)
         auth.log_activity(db, u["id"], None, "login", "")
         if u["must_change_pw"]:
             return redirect(url_for("change_password"))
-        nxt = request.args.get("next") or url_for("index")
+        nxt = _safe_next(request.args.get("next")) or url_for("index")
         return redirect(nxt)
     if auth.current_user(db):
         return redirect(url_for("index"))
@@ -373,7 +463,9 @@ def finding_new():
     db = get_db()
     me = auth.current_user(db)
     if request.method == "POST":
-        _insert_finding(_form_to_dict(request.form), scan_id=None)
+        rec = _form_to_dict(request.form)
+        rec.setdefault("source_tool", "Manual")
+        _insert_finding(rec, scan_id=None)
         fid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
         auth.log_activity(db, me["id"], fid, "created",
                           request.form.get("vulnerability", "")[:120])
@@ -400,7 +492,15 @@ def finding_edit(fid):
             flash("You can view and comment on this finding, but only the security team or the asset owner can edit it.")
             return redirect(url_for("finding_edit", fid=fid))
         prev_status = row["remediation_status"]
-        _update_finding(fid, _form_to_dict(request.form))
+        form_data = _form_to_dict(request.form)
+        # A non-editor asset owner may update remediation progress only — not the
+        # finding's classification, ownership, or the vulnerability details.
+        if me["role"] not in ("admin", "editor"):
+            allowed = {"remediation_status", "actual_fix_date", "exception_requested",
+                       "exception_approved_by", "revised_target_fix_date",
+                       "asset_owners_comment", "comment"}
+            form_data = {k: v for k, v in form_data.items() if k in allowed}
+        _update_finding(fid, form_data)
         fresh = db.execute("SELECT * FROM findings WHERE id=?", (fid,)).fetchone()
         if fresh["remediation_status"] != prev_status:
             auth.log_activity(db, me["id"], fid, "status",
@@ -511,7 +611,10 @@ def _form_to_dict(form):
     for dc in DATE_COLUMNS:
         pd = parse_date(d.get(dc))
         d[dc] = iso(pd)
-    d["source_tool"] = form.get("source_tool", "Manual")
+    # Only set source_tool when the form actually carries it (the edit form does
+    # not), so editing a finding never clobbers its real origin (Nessus, etc.).
+    if form.get("source_tool"):
+        d["source_tool"] = form.get("source_tool")
     return d
 
 

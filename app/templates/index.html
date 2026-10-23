@@ -108,12 +108,13 @@
 {% block scripts %}
 <script>
 const today_iso = "{{ today_iso }}";
+const CSRF = "{{ csrf_token() }}";
 document.querySelectorAll('select.statussel').forEach(sel => {
   sel.addEventListener('change', async (e) => {
     const id = sel.dataset.id;
     const row = sel.closest('tr');
     const res = await fetch(`/finding/${id}/status`, {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
+      method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': CSRF},
       body: JSON.stringify({status: sel.value})
     });
     if (res.status === 403) { alert("You don't have permission to change this finding."); return; }

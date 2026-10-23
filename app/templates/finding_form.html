@@ -9,7 +9,7 @@
 <p class="lede">You can view this finding and join the discussion below. Editing is done by the security team or the finding's asset owner.</p>
 {% endif %}
 
-<form method="post" {% if not can_edit %}onsubmit="return false"{% endif %}><fieldset {% if not can_edit %}disabled style="border:0;padding:0;margin:0;min-width:0"{% else %}style="border:0;padding:0;margin:0;min-width:0"{% endif %}>
+<form method="post" {% if not can_edit %}onsubmit="return false"{% endif %}><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><fieldset {% if not can_edit %}disabled style="border:0;padding:0;margin:0;min-width:0"{% else %}style="border:0;padding:0;margin:0;min-width:0"{% endif %}>
   {% if not is_new %}
   <div class="panel">
     <h2>Calculated</h2>
@@ -146,7 +146,7 @@
     <div class="comment-empty">No comments yet. Start the discussion below.</div>
     {% endfor %}
   </div>
-  <form class="comment-form" method="post" action="{{ url_for('finding_comment', fid=finding.id) }}">
+  <form class="comment-form" method="post" action="{{ url_for('finding_comment', fid=finding.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <textarea name="body" placeholder="Add a comment — a question, an update, a decision…" required></textarea>
     <div><button class="btn primary" type="submit">Post comment</button></div>
   </form>
@@ -171,7 +171,7 @@ if (addBtn) addBtn.addEventListener('click', async () => {
   const name = prompt('New asset owner name:');
   if (!name) return;
   const res = await fetch('/owners/add_ajax', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
+    method: 'POST', headers: {'Content-Type':'application/json', 'X-CSRF-Token': '{{ csrf_token() }}'},
     body: JSON.stringify({name})
   });
   const data = await res.json();

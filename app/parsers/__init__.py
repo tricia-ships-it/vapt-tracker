@@ -26,6 +26,19 @@ __all__ = [
 import xml.etree.ElementTree as ET
 
 
+def _reject_dangerous_xml(raw_bytes):
+    """
+    Defence against XML entity-expansion ("billion laughs") and any DTD tricks.
+    Python's stdlib ElementTree does not resolve external entities, but internal
+    entity expansion can still exhaust memory. Scan files never legitimately
+    contain a DTD or custom entities, so we refuse them outright.
+    """
+    head = raw_bytes[:8192].lower()
+    if b"<!doctype" in head or b"<!entity" in head:
+        raise ValueError("XML contains a DOCTYPE or ENTITY declaration, which is not "
+                         "allowed in scan files (possible entity-expansion attack).")
+
+
 def detect_and_parse(raw_bytes, filename=""):
     """
     Sniff the file type and dispatch. Returns (source_label, findings_list).
@@ -36,6 +49,8 @@ def detect_and_parse(raw_bytes, filename=""):
 
     # CSV detection first (no XML declaration, has comma header)
     is_xml = text_head.lstrip().startswith("<?xml") or text_head.lstrip().startswith("<")
+    if is_xml:
+        _reject_dangerous_xml(raw_bytes)
 
     if not is_xml:
         # CSV — distinguish Nessus vs OpenVAS by header columns

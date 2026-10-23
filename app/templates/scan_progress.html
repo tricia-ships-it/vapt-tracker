@@ -17,7 +17,7 @@
   <div class="panel" style="border-color:#2a3a1f">
     <h2>Scan complete</h2>
     <p class="subhead" id="donesummary"></p>
-    <form method="post" id="commitform">
+    <form method="post" id="commitform"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
       <div class="form-actions" style="margin-top:0">
         <button class="btn primary" type="submit">Add findings to register</button>
         <a class="btn ghost" href="{{ url_for('scan_page') }}">Run another scan</a>

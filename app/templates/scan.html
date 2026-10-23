@@ -5,7 +5,7 @@
 <h1>Run a vulnerability assessment</h1>
 <p class="lede">The built-in scanner probes your targets locally — discovery, open ports, service versions, TLS and HTTP weaknesses, and known-CVE matches. It identifies and reports only; it does not exploit. Penetration testing stays manual.</p>
 
-<form method="post" action="{{ url_for('scan_start') }}">
+<form method="post" action="{{ url_for('scan_start') }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
   <div class="panel">
     <h2>Targets</h2>
     <div class="form-grid">
