@@ -56,6 +56,38 @@ are what ship in this repository.
   and admins. Ping uses a fixed argument list (no shell), and targets are
   validated as IPs/CIDR/ranges before use — no command injection.
 
+## Dependency security
+
+Runtime dependencies are **pinned to exact versions** in `app/requirements.txt`
+(Flask, openpyxl, and optionally reportlab; Flask pulls in Werkzeug, Jinja2,
+MarkupSafe, itsdangerous, click and blinker). Pinning keeps installs predictable
+and makes audits meaningful.
+
+**Audit for known CVEs** — run before deploying and periodically after:
+
+```bash
+./scripts/audit.sh            # Linux / macOS
+powershell -ExecutionPolicy Bypass -File scripts\audit.ps1   # Windows
+```
+
+Both wrap [`pip-audit`](https://pypi.org/project/pip-audit/), which checks your
+installed packages against the PyPI Advisory and OSV databases. If it flags a
+package, bump its pin in `app/requirements.txt` and re-run.
+
+**Reproducible, hash-verified installs (recommended for production).** Generate a
+lock on your target platform so every install is byte-for-byte verified — this is
+done on your machine rather than shipped, because wheel hashes are
+platform-specific:
+
+```bash
+pip install pip-tools
+pip-compile --generate-hashes --output-file=app/requirements.lock app/requirements.txt
+pip install --require-hashes -r app/requirements.lock
+```
+
+The air-gapped install flow (wheel cache) in `app/README.md` works the same way
+with `--require-hashes` added.
+
 ## Operational hardening (your responsibility when deploying)
 
 1. **Serve behind HTTPS.** The app speaks plain HTTP by default, which is fine on

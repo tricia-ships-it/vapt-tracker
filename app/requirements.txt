@@ -1,3 +1,19 @@
-Flask>=2.3
-openpyxl>=3.1
-reportlab>=4.0   ; optional — PDF export falls back to printable HTML if absent
+# VAPT Tracker dependencies — pinned to exact, tested versions.
+# Werkzeug/Jinja2/MarkupSafe/itsdangerous/click/blinker are pulled in by Flask;
+# installing this pins the top level. For a fully reproducible, hash-verified
+# install (recommended for production), generate a lock on your target platform:
+#
+#     pip install pip-tools
+#     pip-compile --generate-hashes --output-file=requirements.lock requirements.txt
+#     pip install --require-hashes -r requirements.lock
+#
+# Audit for known CVEs any time (see SECURITY.md):
+#
+#     pip install pip-audit && pip-audit -r requirements.txt
+
+Flask==3.1.3
+openpyxl==3.1.5
+
+# Optional — PDF export. Without it, PDF export falls back to a print-ready
+# HTML page. Remove this line if you don't need native PDF output.
+reportlab==5.0.1
