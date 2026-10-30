@@ -4,6 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}VAPT Tracker{% endblock %}</title>
+  <script>
+    // Apply saved theme before paint to avoid a flash. Default: dark.
+    (function () {
+      try {
+        var t = localStorage.getItem('vapt-theme');
+        if (!t) t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -14,6 +24,7 @@
       <span class="tag">internal · offline</span>
     </div>
     <nav class="topnav">
+      <a href="{{ url_for('dashboard') }}">Dashboard</a>
       <a href="{{ url_for('index') }}">Findings</a>
       <a href="{{ url_for('activity_feed') }}">Activity</a>
       {% if can_import_or_scan %}
@@ -25,6 +36,7 @@
       {% if can_import_or_scan %}<a href="{{ url_for('scan_page') }}" class="primary">Run scan</a>{% endif %}
     </nav>
     <div class="usermenu">
+      <button type="button" class="theme-toggle" id="themeToggle" title="Toggle light / dark" aria-label="Toggle light or dark theme">◐</button>
       <span class="uname">{{ current_user.display_name or current_user.username }}</span>
       <span class="urole">{{ role_labels.get(current_user.role, current_user.role) }}</span>
       <a href="{{ url_for('change_password') }}" title="Change password" class="umlink">Password</a>
@@ -38,6 +50,20 @@
     {% endwith %}
     {% block body %}{% endblock %}
   </main>
+  <script>
+    // Theme toggle: switch, persist, and notify charts to redraw.
+    (function () {
+      var btn = document.getElementById('themeToggle');
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        if (isLight) { document.documentElement.removeAttribute('data-theme'); save('dark'); }
+        else { document.documentElement.setAttribute('data-theme', 'light'); save('light'); }
+        window.dispatchEvent(new Event('themechange'));
+      });
+      function save(v) { try { localStorage.setItem('vapt-theme', v); } catch (e) {} }
+    })();
+  </script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

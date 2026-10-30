@@ -17,6 +17,11 @@ It does three jobs:
    same register, comments on findings, and watches an activity feed. Hosted on
    the intranet, reachable by IP from any browser inside the network.
 
+A visual **Dashboard** summarises risk posture and remediation progress in charts
+for easy presentation, and the whole interface has a **light and dark theme**
+(toggle in the top bar). The charts are drawn in plain SVG with no third-party
+library, so everything still runs fully offline.
+
 > **Scope.** This performs *vulnerability assessment* — it identifies and
 > reports. It does **not** exploit, brute-force, or alter targets. Penetration
 > testing is done manually, by design.

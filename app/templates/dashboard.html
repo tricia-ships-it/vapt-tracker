@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · VAPT Tracker{% endblock %}
+{% block body %}
+
+<h1>Dashboard</h1>
+<p class="lede">A visual summary of this quarter's assessment — risk posture, remediation progress and where attention is needed. Updates live from the register.</p>
+
+<div id="dash-root">
+  <div class="dash-empty">Loading charts…</div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='charts.js') }}"></script>
+<script>
+async function loadDashboard() {
+  const root = document.getElementById('dash-root');
+  let d;
+  try {
+    const res = await fetch('{{ url_for("dashboard_data") }}');
+    d = await res.json();
+  } catch (e) {
+    root.innerHTML = '<div class="dash-empty">Could not load dashboard data.</div>';
+    return;
+  }
+  if (!d.totals.total) {
+    root.innerHTML = '<div class="dash-empty"><h3 style="color:var(--ink)">No findings yet</h3>'
+      + '<p>Import a scan or run the built-in scanner to populate the dashboard.</p></div>';
+    return;
+  }
+
+  const t = d.totals;
+  root.innerHTML = `
+    <div class="dash-grid">
+      <div class="card col-3 kpi"><div class="kpi-n">${t.total}</div><div class="kpi-l">Total findings</div></div>
+      <div class="card col-3 kpi crit"><div class="kpi-n">${t.critical}</div><div class="kpi-l">Critical (actual risk)</div></div>
+      <div class="card col-3 kpi high"><div class="kpi-n">${t.high}</div><div class="kpi-l">High (actual risk)</div></div>
+      <div class="card col-3 kpi breach"><div class="kpi-n">${t.breached}</div><div class="kpi-l">Risk tolerance breached</div></div>
+
+      <div class="card col-4">
+        <h3>Actual risk classification</h3>
+        <div class="card-sub">Severity after asset criticality + exploit</div>
+        <div id="c-risk"></div>
+      </div>
+      <div class="card col-4">
+        <h3>Remediation status</h3>
+        <div class="card-sub">Where every finding stands right now</div>
+        <div id="c-status"></div>
+      </div>
+      <div class="card col-4">
+        <h3>Risk tolerance objective</h3>
+        <div class="card-sub">Met vs breached vs not yet resolved</div>
+        <div id="c-rto"></div>
+      </div>
+
+      <div class="card col-6">
+        <h3>Remediation progress</h3>
+        <div class="card-sub">${t.fixed} fixed, ${t.open} open${t.overdue ? ', <span style="color:var(--high)">' + t.overdue + ' past target date</span>' : ''}</div>
+        <div style="display:flex;align-items:baseline;gap:10px;margin-top:4px">
+          <span class="kpi-n" style="color:var(--met);font-family:var(--mono);font-size:30px;font-weight:600">${t.remediation_rate}%</span>
+          <span style="font-size:12px;color:var(--ink-dim)">resolved</span>
+        </div>
+        <div class="meter"><span style="width:${t.remediation_rate}%"></span></div>
+        <div id="c-openclosed" style="margin-top:18px"></div>
+      </div>
+      <div class="card col-6">
+        <h3>Findings by asset owner</h3>
+        <div class="card-sub">Who holds the most open work</div>
+        <div id="c-owners"></div>
+      </div>
+
+      <div class="card col-6">
+        <h3>Reported severity (scanner)</h3>
+        <div class="card-sub">As the scan engine rated each finding</div>
+        <div id="c-reported"></div>
+      </div>
+      <div class="card col-6">
+        <h3>Exploit availability</h3>
+        <div class="card-sub">Public exploit known for the vulnerability</div>
+        <div id="c-exploit"></div>
+      </div>
+    </div>`;
+
+  const toArr = (obj) => Object.keys(obj).map(k => ({label: k, value: obj[k]})).filter(x => x.value > 0);
+
+  // Donuts
+  VChart.donut(document.getElementById('c-risk'), toArr(d.by_actual_risk), {centerLabelText: 'findings'});
+  VChart.donut(document.getElementById('c-rto'),
+    [ {label:'Met', value:d.by_rto.Met}, {label:'Breached', value:d.by_rto.Breached},
+      {label:'Not Applicable', value:d.by_rto['Not Applicable']}, {label:'Open', value:d.by_rto.Open} ].filter(x=>x.value>0),
+    {centerValue: d.by_rto.Breached, centerLabelText: 'breached'});
+  VChart.donut(document.getElementById('c-exploit'), toArr(d.by_exploit), {centerLabelText: 'findings'});
+
+  // Bars
+  VChart.hbars(document.getElementById('c-status'),
+    Object.keys(d.by_status).map(k => ({label:k, value:d.by_status[k]})), {byLabel: true});
+  VChart.hbars(document.getElementById('c-reported'),
+    toArr(d.by_reported), {byLabel: true});
+  VChart.hbars(document.getElementById('c-owners'),
+    d.top_owners.map(o => ({label:o[0], value:o[1]})), {});
+  VChart.hbars(document.getElementById('c-openclosed'),
+    [ {label:'Open', value:d.open_vs_closed.Open},
+      {label:'Fixed', value:d.open_vs_closed.Fixed},
+      {label:'Not Applicable', value:d.open_vs_closed['Not Applicable']} ].filter(x=>x.value>0),
+    {byLabel: true});
+}
+loadDashboard();
+// redraw when the theme changes so chart colours follow
+window.addEventListener('themechange', loadDashboard);
+</script>
+{% endblock %}

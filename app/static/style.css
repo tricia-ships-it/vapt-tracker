@@ -27,8 +27,34 @@
   --met:   #51cf66;
   --breach:#ff4d5e;
   --radius: 7px;
+  --shadow: 0 1px 3px rgba(0,0,0,.35);
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Light theme — applied when the viewer chooses it (data-theme="light" on <html>).
+   Dark is the default. Only the colour tokens change; every component reads them. */
+:root[data-theme="light"] {
+  --bg:        #f3f6fa;
+  --panel:     #ffffff;
+  --panel-2:   #eef2f7;
+  --line:      #d7dee7;
+  --line-soft: #e6ebf1;
+  --ink:       #1b2430;
+  --ink-dim:   #566372;
+  --ink-faint: #8995a4;
+  --accent:    #2563eb;
+  --accent-dim:#9cbcf5;
+
+  --crit:  #c81e2d;  --crit-bg:  #fdecee;
+  --high:  #b2510b;  --high-bg:  #fbeadd;
+  --med:   #8a6200;  --med-bg:   #f8f0d6;
+  --low:   #15803d;  --low-bg:   #e4f6ea;
+  --info:  #5a6775;  --info-bg:  #eef2f7;
+
+  --met:   #15803d;
+  --breach:#c81e2d;
+  --shadow: 0 1px 3px rgba(20,30,50,.10);
 }
 
 * { box-sizing: border-box; }
@@ -273,3 +299,59 @@ select.statussel {
 
 .note { font-size: 12px; color: var(--ink-faint); margin-top: 10px; }
 code.k { font-family: var(--mono); background: var(--panel-2); padding: 1px 6px; border-radius: 4px; color: var(--accent); }
+
+/* ===== theme toggle button ===== */
+.theme-toggle {
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-dim);
+  width: 32px; height: 32px; border-radius: 7px; cursor: pointer; display: inline-flex;
+  align-items: center; justify-content: center; padding: 0; font-size: 15px; line-height: 1;
+}
+.theme-toggle:hover { color: var(--ink); border-color: var(--accent-dim); }
+body { transition: background .2s ease, color .2s ease; }
+
+/* ===== dashboard ===== */
+.dash-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 18px; box-shadow: var(--shadow);
+}
+.card h3 { font-size: 13px; font-weight: 600; margin: 0 0 2px; color: var(--ink); }
+.card .card-sub { font-size: 11.5px; color: var(--ink-faint); margin: 0 0 14px; }
+.col-3 { grid-column: span 3; } .col-4 { grid-column: span 4; }
+.col-6 { grid-column: span 6; } .col-8 { grid-column: span 8; } .col-12 { grid-column: span 12; }
+@media (max-width: 1100px) { .col-3 { grid-column: span 6; } .col-4 { grid-column: span 6; }
+  .col-8 { grid-column: span 12; } .col-6 { grid-column: span 12; } }
+@media (max-width: 620px) { .col-3, .col-4 { grid-column: span 12; } }
+
+/* KPI tiles */
+.kpi { display: flex; flex-direction: column; gap: 8px; }
+.kpi .kpi-n { font-family: var(--mono); font-size: 30px; font-weight: 600; line-height: 1;
+  font-variant-numeric: tabular-nums; }
+.kpi .kpi-l { font-size: 12px; color: var(--ink-dim); }
+.kpi.crit .kpi-n { color: var(--crit); } .kpi.high .kpi-n { color: var(--high); }
+.kpi.breach .kpi-n { color: var(--breach); } .kpi.good .kpi-n { color: var(--met); }
+.kpi .trend { font-size: 11px; color: var(--ink-faint); }
+
+/* donut + legend layout */
+.donut-wrap { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.donut-wrap svg { flex-shrink: 0; }
+.legend { display: flex; flex-direction: column; gap: 7px; min-width: 0; flex: 1; }
+.legend .li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.legend .sw { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+.legend .ln { color: var(--ink-dim); min-width: 0; }
+.legend .lv { margin-left: auto; font-family: var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+.donut-center { font-family: var(--mono); font-weight: 600; }
+
+/* horizontal bar chart */
+.hbars { display: flex; flex-direction: column; gap: 11px; }
+.hbar { display: grid; grid-template-columns: 110px 1fr 36px; align-items: center; gap: 10px; }
+.hbar .hb-label { font-size: 12px; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hbar .hb-track { background: var(--panel-2); border-radius: 5px; height: 18px; overflow: hidden; }
+.hbar .hb-fill { height: 100%; border-radius: 5px; transition: width .6s cubic-bezier(.22,1,.36,1); }
+.hbar .hb-val { font-family: var(--mono); font-size: 12px; text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* progress meter */
+.meter { height: 10px; border-radius: 6px; background: var(--panel-2); overflow: hidden; margin-top: 6px; }
+.meter > span { display: block; height: 100%; background: var(--met); border-radius: 6px; transition: width .6s cubic-bezier(.22,1,.36,1); }
+
+.dash-empty { text-align: center; padding: 60px 20px; color: var(--ink-dim); }

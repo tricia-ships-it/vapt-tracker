@@ -457,6 +457,96 @@ def _is_overdue(r):
     return parse_date(tfd) < date.today()
 
 
+# ---------------------------------------------------------------------------
+# Routes: dashboard (charts & summary for presentation)
+# ---------------------------------------------------------------------------
+@app.route("/dashboard")
+@auth.login_required
+def dashboard():
+    return render_template("dashboard.html")
+
+
+@app.route("/dashboard/data")
+@auth.login_required
+def dashboard_data():
+    """Aggregations for the dashboard charts, computed from live findings."""
+    db = get_db()
+    rows = [enrich(r) for r in db.execute("SELECT * FROM findings")]
+    today = date.today()
+
+    def counter(order):
+        return {k: 0 for k in order}
+
+    sev_order = ["Critical", "High", "Medium", "Low", "Information"]
+    status_order = engine.REMEDIATION_STATUSES
+    rto_order = ["Met", "Breached", "Not Applicable", "Open"]
+
+    by_actual_risk = counter(sev_order)
+    by_reported = counter(sev_order)
+    by_status = counter(status_order)
+    by_rto = counter(rto_order)
+    by_exploit = {"Yes": 0, "No": 0, "Unknown": 0}
+    owners = {}
+    open_vs_closed = {"Open": 0, "Fixed": 0, "Not Applicable": 0}
+    overdue = 0
+
+    for r in rows:
+        ar = r["actual_risk_classification"]
+        if ar in by_actual_risk:
+            by_actual_risk[ar] += 1
+        rr = r["reported_risk"]
+        if rr in by_reported:
+            by_reported[rr] += 1
+        st = r["remediation_status"]
+        if st in by_status:
+            by_status[st] += 1
+        rto = r["risk_tolerance_objective"]
+        if rto in ("Met", "Breached", "Not Applicable"):
+            by_rto[rto] += 1
+        else:
+            by_rto["Open"] += 1
+        ex = r["exploit_available"] or "Unknown"
+        by_exploit[ex] = by_exploit.get(ex, 0) + 1
+        owner = r["asset_owner"] or "Unassigned"
+        owners[owner] = owners.get(owner, 0) + 1
+        if st == "Fixed":
+            open_vs_closed["Fixed"] += 1
+        elif st == "Not Applicable":
+            open_vs_closed["Not Applicable"] += 1
+        else:
+            open_vs_closed["Open"] += 1
+        if _is_overdue(r):
+            overdue += 1
+
+    # top owners by finding count (max 8)
+    top_owners = sorted(owners.items(), key=lambda kv: kv[1], reverse=True)[:8]
+
+    total = len(rows)
+    crit = by_actual_risk["Critical"]
+    high = by_actual_risk["High"]
+    open_count = open_vs_closed["Open"]
+    fixed = open_vs_closed["Fixed"]
+    breached = by_rto["Breached"]
+    # remediation rate = resolved / total
+    resolved = fixed + open_vs_closed["Not Applicable"]
+    rem_rate = round(100 * resolved / total) if total else 0
+
+    return jsonify({
+        "totals": {
+            "total": total, "critical": crit, "high": high,
+            "open": open_count, "fixed": fixed, "breached": breached,
+            "overdue": overdue, "remediation_rate": rem_rate,
+        },
+        "by_actual_risk": by_actual_risk,
+        "by_reported": by_reported,
+        "by_status": {k: v for k, v in by_status.items() if v > 0},
+        "by_rto": by_rto,
+        "by_exploit": by_exploit,
+        "top_owners": top_owners,
+        "open_vs_closed": open_vs_closed,
+    })
+
+
 @app.route("/finding/new", methods=["GET", "POST"])
 @auth.role_required("admin", "editor")
 def finding_new():
