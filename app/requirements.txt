@@ -17,3 +17,7 @@ openpyxl==3.1.5
 # Optional — PDF export. Without it, PDF export falls back to a print-ready
 # HTML page. Remove this line if you don't need native PDF output.
 reportlab==5.0.1
+
+# Optional — production WSGI server for hosting to a team (recommended over the
+# Flask dev server). Run with:  waitress-serve --listen=0.0.0.0:8080 wsgi:app
+waitress==3.0.2
