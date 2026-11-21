@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+{% block title %}{{ c.name }} · Argus{% endblock %}
+{% block body %}
+
+<div class="page-head">
+  <div>
+    <p class="crumb"><a href="{{ url_for('phishing_view') }}">Phishing awareness</a> ›</p>
+    <h1>{{ c.name }}
+      {% if c.status == 'Active' %}<span class="risk High sm">Active</span>
+      {% elif c.status == 'Closed' %}<span class="risk Low sm">Closed</span>
+      {% else %}<span class="risk Information sm">Draft</span>{% endif %}
+    </h1>
+    <p class="lede">Template: <span class="mono">{{ c.template_key }}</span> · channel: <span class="chan-badge">{{ channel }}</span>{% if c.authorized %} · <span class="auth-ok">authorised ✓</span>{% endif %}{% if c.launched_at %} · launched {{ c.launched_at[:16].replace('T',' ') }}{% endif %}</p>
+  </div>
+  <div class="head-actions">
+    {% if can_manage %}
+    <a class="btn ghost" href="{{ url_for('phishing_export', cid=c.id) }}">Export links (CSV)</a>
+    {% if c.status == 'Draft' %}
+    <form method="post" action="{{ url_for('phishing_launch', cid=c.id) }}" style="display:inline">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <button class="btn primary" type="submit">Launch</button>
+    </form>
+    {% elif c.status == 'Active' %}
+    <form method="post" action="{{ url_for('phishing_close', cid=c.id) }}" style="display:inline">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <button class="btn" type="submit">Close campaign</button>
+    </form>
+    {% endif %}
+    <form method="post" action="{{ url_for('phishing_delete', cid=c.id) }}" style="display:inline"
+          onsubmit="return confirm('Delete this campaign and all its tracking data?');">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <button class="btn ghost danger" type="submit">Delete</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="n count" data-count="{{ stats.recipients }}">{{ stats.recipients }}</div><div class="l">Recipients</div></div>
+  <div class="stat breach"><div class="n count" data-count="{{ stats.clicked }}">{{ stats.clicked }}</div><div class="l">Clicked ({{ stats.click_rate }}%)</div></div>
+  <div class="stat" style="--accent:var(--low)"><div class="n count" data-count="{{ stats.reported }}">{{ stats.reported }}</div><div class="l">Reported</div></div>
+  <div class="stat"><div class="n count" data-count="{{ stats.not_clicked }}">{{ stats.not_clicked }}</div><div class="l">No click yet</div></div>
+</div>
+
+{% if c.status == 'Draft' %}
+<div class="note">This campaign is a draft. Add recipients below, then <strong>Launch</strong> to start recording clicks. Tracking links only count once a campaign is Active.</div>
+{% elif c.status == 'Active' %}
+<div class="note">Active. Export the links and send the email from your authorised mail relay — Argus does not send mail itself. Clicks appear below as they happen.</div>
+{% endif %}
+
+<div class="split">
+  <div>
+    <h3 class="sect">Recipients</h3>
+    {% if recips %}
+    <div class="table-scroll">
+    <table class="grid">
+      <thead>
+        <tr><th>Name</th><th>Contact</th><th>Dept</th><th>Delivery</th><th>Outcome</th><th>When</th><th>{% if is_manual %}Message{% else %}Link{% endif %}</th></tr>
+      </thead>
+      <tbody>
+        {% for r in recips %}
+        <tr>
+          <td>{{ r.name or (r.email.split('@')[0] if r.email else '—') }}</td>
+          <td class="mono">{% if channel in ['sms','whatsapp'] %}{{ r.phone or '—' }}{% elif channel == 'social' %}{{ r.handle or '—' }}{% else %}{{ r.email or '—' }}{% endif %}</td>
+          <td class="muted">{{ r.department or '—' }}</td>
+          <td class="nowrap">
+            {% if r.delivery_status == 'sent' %}<span class="risk Low sm">Sent</span>
+            {% elif r.delivery_status == 'failed' %}<span class="risk Critical sm" title="{{ r.delivery_error }}">Failed</span>
+            {% else %}<span class="muted">—</span>{% endif %}
+          </td>
+          <td class="nowrap">
+            {% if r.reported_at %}<span class="risk Low sm">Reported ✓</span>
+            {% elif r.clicked_at %}<span class="risk High sm">Clicked</span>{% if r.click_count > 1 %} <span class="muted mono">×{{ r.click_count }}</span>{% endif %}
+            {% else %}<span class="muted">No click</span>{% endif %}
+          </td>
+          <td class="mono nowrap muted">{{ (r.reported_at or r.clicked_at or '')[:16].replace('T',' ') or '—' }}</td>
+          <td class="nowrap">
+            {% if is_manual %}
+            <button class="btn sm ghost copymsg" data-name="{{ r.name }}" data-email="{{ r.email }}" data-link="{{ url_for('phish_land', token=r.token, _external=True) }}">Copy message</button>
+            {% else %}
+            <button class="btn sm ghost copylink" data-link="{{ url_for('phish_land', token=r.token, _external=True) }}">Copy link</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="note">No recipients yet.</div>
+    {% endif %}
+
+    {% if can_manage and c.status != 'Closed' %}
+    <form method="post" action="{{ url_for('phishing_recipients', cid=c.id) }}" class="stack" style="margin-top:16px">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <div class="field">
+        <label for="recipients">Add recipients <span class="muted">— one per line. Mix any of: name, email, <span class="mono">+phone</span>, <span class="mono">@handle</span>, department (any order)</span></label>
+        <textarea id="recipients" name="recipients" rows="4" placeholder="Alex Mensah, alex@company.example, Finance&#10;Jordan Owusu, +233201234567&#10;Ama Boateng, @ama.b, ama@company.example"></textarea>
+      </div>
+      <div><button class="btn" type="submit">Add recipients</button></div>
+    </form>
+    {% endif %}
+  </div>
+
+  <aside class="side">
+    {% if can_manage %}
+    <h3 class="sect">Delivery</h3>
+    <div class="card send-card">
+      {% if is_manual %}
+      <p class="card-sub">This campaign uses <b>social handles</b>, which Argus never auto-sends. Use the <b>Copy message</b> button on each recipient to paste their personalised message and link into a sanctioned channel by hand.</p>
+      {% else %}
+      <div class="kv"><span>Channel</span><b>{{ channel }}</b></div>
+      <div class="kv"><span>Provider</span>
+        {% if provider_ready %}<b class="auth-ok">configured</b>
+        {% else %}<b class="risk-text">not configured</b>{% endif %}
+      </div>
+      {% if not provider_ready %}
+      <p class="card-sub">Set this channel's credentials in the server environment, then reload. Argus reads provider secrets from the environment only — never from this page — so they stay out of the database. See <a href="{{ url_for('settings_page') }}">Settings</a> for the variable names.</p>
+      {% endif %}
+
+      {% if not c.authorized %}
+      <form method="post" action="{{ url_for('phishing_authorize', cid=c.id) }}" class="auth-gate">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <label class="chk"><input type="checkbox" name="confirm" value="1"> <span>I confirm these recipients are people or systems my organisation has authorised me to test.</span></label>
+        <button class="btn" type="submit">Record authorisation</button>
+      </form>
+      {% else %}
+      <p class="card-sub auth-ok">✓ Authorised by {{ c.authorized_by }} · {{ c.authorized_at[:10] if c.authorized_at }}</p>
+
+      <form method="post" action="{{ url_for('phishing_testsend', cid=c.id) }}" class="test-send">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <label class="lbl">Send a test to yourself first</label>
+        <div class="inline">
+          <input type="text" name="target" placeholder="{{ 'your@email' if channel=='email' else '+233…' }}">
+          <button class="btn sm" type="submit">Test</button>
+        </div>
+      </form>
+
+      {% if c.status == 'Active' %}
+      <div id="sendbox" data-job-url="{{ url_for('phishing_job', cid=c.id) }}">
+        <div class="job-live" style="display:none">
+          <div class="job-head"><span class="job-state"></span><span class="job-count mono"></span></div>
+          <div class="meter"><span class="job-bar" style="width:0%"></span></div>
+          <div class="job-sub muted"></div>
+          <form method="post" action="{{ url_for('phishing_job_cancel', cid=c.id) }}" class="job-cancel" style="margin-top:8px">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <button class="btn sm ghost" type="submit">Cancel send</button>
+          </form>
+        </div>
+        <form method="post" action="{{ url_for('phishing_send', cid=c.id) }}" class="send-form" style="margin-top:12px"
+              onsubmit="return confirm('Queue a send for this campaign?');">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+          <div class="grid-2" style="gap:10px">
+            <label class="mini"><span>Rate / min</span><input type="number" name="rate" value="30" min="1" max="600"></label>
+            <label class="mini"><span>Schedule <span class="muted">(optional)</span></span><input type="datetime-local" name="scheduled_at"></label>
+          </div>
+          <button class="btn primary full-btn" type="submit" style="margin-top:10px" {{ 'disabled' if not provider_ready }}>Queue send{% if pending %} · {{ pending }} pending{% endif %}</button>
+          <label class="chk" style="margin-top:8px"><input type="checkbox" name="resend" value="1"> <span>Include people already sent to (re-send everyone)</span></label>
+        </form>
+      </div>
+      {% else %}
+      <p class="card-sub" style="margin-top:12px">Launch the campaign to enable sending.</p>
+      {% endif %}
+      {% endif %}
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <h3 class="sect">The simulated {{ 'message' if channel != 'email' else 'email' }}</h3>
+    <div class="mailcard">
+      <div class="mail-h"><span class="muted">From:</span> {{ c.sender }}</div>
+      <div class="mail-h"><span class="muted">Subject:</span> {{ c.subject }}</div>
+      <pre class="mail-body">{{ sample }}</pre>
+    </div>
+
+    {% if flags %}
+    <h3 class="sect">What the lesson teaches</h3>
+    <p class="muted" style="font-size:12.5px;margin-top:-4px">Shown on the page anyone sees after clicking:</p>
+    <ul class="flaglist">
+      {% for f in flags %}<li>{{ f }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+    <p class="note">Argus never collects passwords. The link opens a short explanation only — there is no login form anywhere in this exercise.</p>
+  </aside>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function flash(b) { var o = b.textContent; b.textContent = 'Copied ✓'; setTimeout(function () { b.textContent = o; }, 1200); }
+document.querySelectorAll('.copylink').forEach(function (b) {
+  b.addEventListener('click', function () {
+    navigator.clipboard.writeText(b.getAttribute('data-link')).then(function () { flash(b); });
+  });
+});
+var BODY = {{ c.body|tojson }};
+function firstName(name, email) {
+  if (name && name.trim()) return name.trim().split(/\s+/)[0];
+  if (email && email.indexOf('@') > 0) {
+    var p = email.split('@')[0].split(/[._+\-]+/);
+    for (var i = 0; i < p.length; i++) { var w = p[i].replace(/\d+/g, ''); if (/[aeiou]/i.test(w) && w.length >= 2) return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); }
+  }
+  return 'there';
+}
+document.querySelectorAll('.copymsg').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var fn = firstName(b.getAttribute('data-name'), b.getAttribute('data-email'));
+    var msg = BODY.split('{{ "{{name}}" }}').join(fn).split('{{ "{{link}}" }}').join(b.getAttribute('data-link'));
+    navigator.clipboard.writeText(msg).then(function () { flash(b); });
+  });
+});
+
+// live send-job progress
+(function () {
+  var box = document.getElementById('sendbox');
+  if (!box) return;
+  var live = box.querySelector('.job-live'), form = box.querySelector('.send-form');
+  var LIVE = ['scheduled', 'queued', 'running', 'canceling'];
+  var reloadWhenDone = false;
+  function paint(j) {
+    if (!j || !j.exists) {
+      live.style.display = 'none'; form.style.display = ''; return;
+    }
+    var isLive = LIVE.indexOf(j.status) >= 0;
+    live.style.display = ''; form.style.display = isLive ? 'none' : '';
+    live.querySelector('.job-state').textContent =
+      ({scheduled: 'Scheduled', queued: 'Queued…', running: 'Sending…', canceling: 'Cancelling…',
+        done: 'Send complete', failed: 'Send failed', canceled: 'Send cancelled'})[j.status] || j.status;
+    live.querySelector('.job-count').textContent = j.processed + ' / ' + j.total;
+    live.querySelector('.job-bar').style.width = (j.pct || 0) + '%';
+    var sub = j.ok_count + ' sent' + (j.fail_count ? ', ' + j.fail_count + ' failed' : '');
+    if (j.status === 'scheduled' && j.scheduled_at) sub = 'runs at ' + j.scheduled_at;
+    if (j.status === 'failed' && j.last_error) sub = j.last_error;
+    live.querySelector('.job-sub').textContent = sub;
+    live.querySelector('.job-cancel').style.display = isLive ? '' : 'none';
+    if (isLive) reloadWhenDone = true;
+    else if (reloadWhenDone) { reloadWhenDone = false; setTimeout(function () { location.reload(); }, 900); }
+  }
+  function poll() {
+    fetch(box.dataset.jobUrl).then(function (r) { return r.json(); }).then(function (j) {
+      paint(j);
+      var again = j && j.exists && LIVE.indexOf(j.status) >= 0;
+      setTimeout(poll, again ? 1500 : 6000);
+    }).catch(function () { setTimeout(poll, 6000); });
+  }
+  poll();
+})();
+</script>
+{% endblock %}

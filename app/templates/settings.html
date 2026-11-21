@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Settings · Argus{% endblock %}
+{% block body %}
+
+<h1>Settings</h1>
+<p class="lede">Threat-intelligence feeds. The app is offline by default — nothing contacts the internet unless you turn it on here.</p>
+
+<div class="detail-grid">
+  <div class="detail-main">
+    <div class="card">
+      <h3>Threat-feed updates</h3>
+      <div class="secnote">
+        <b>How this stays safe:</b> updates only ever <b>download</b> public vulnerability feeds.
+        Your asset inventory never leaves this machine — the fetcher can only perform an HTTP
+        <b>GET</b> to a URL on the list below, and has no way to send your data. Matching runs
+        entirely locally.
+      </div>
+      <form method="post" action="{{ url_for('settings_threatintel') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+
+        <label class="switch-row">
+          <input type="checkbox" name="ti_enabled" {{ 'checked' if ti_enabled }}>
+          <span><b>Enable online threat-feed updates</b><br>
+            <span class="muted">When off (the default), the app makes no outbound connections. Turn on only if this machine is allowed to reach the internet.</span></span>
+        </label>
+
+        <div class="allow-head">Allowed sources — the complete list of endpoints the app may contact. Untick to remove one.</div>
+        {% for s in sources %}
+        <label class="src-row">
+          <input type="checkbox" name="src_{{ s.id }}" {{ 'checked' if s.checked }}>
+          <span class="src-body">
+            <span class="src-name">{{ s.name }}</span>
+            <span class="src-url mono">GET {{ s.url }}</span>
+            <span class="src-desc muted">{{ s.desc }}</span>
+          </span>
+        </label>
+        {% endfor %}
+
+        <label class="field">
+          <span class="muted">Egress proxy (optional) — route the download through your own proxy instead of connecting directly.</span>
+          <input type="text" name="ti_proxy" value="{{ ti_proxy }}" placeholder="http://proxy.internal:3128">
+        </label>
+
+        <button class="btn primary" type="submit">Save settings</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Compliance frameworks</h3>
+      <p class="card-sub">Tick the frameworks relevant to your environment. The Compliance view and each finding's control mapping show only the ones you enable.</p>
+      <form method="post" action="{{ url_for('settings_frameworks') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        {% for f in frameworks %}
+        <label class="src-row">
+          <input type="checkbox" name="fw_{{ f.id }}" {{ 'checked' if f.checked }}>
+          <span class="src-body">
+            <span class="src-name">{{ f.name }}</span>
+            <span class="src-desc muted">{{ f.desc }}</span>
+          </span>
+        </label>
+        {% endfor %}
+        <button class="btn primary" type="submit" style="margin-top:6px">Save frameworks</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Phishing delivery providers</h3>
+      <p class="card-sub">For automated phishing-awareness sends. Argus reads provider credentials from the <b>server environment only</b> — never through this page — so secrets stay out of the database and its backups. Set the variables below on the host, then restart Argus.</p>
+      <div class="prov-row">
+        <span class="src-name">Email (SMTP)</span>
+        {% if delivery_status.email %}<span class="risk Low sm">configured</span>{% else %}<span class="muted">not set</span>{% endif %}
+      </div>
+      <pre class="envblock">ARGUS_BASE_URL=https://argus.yourco.example   # used in tracked links
+ARGUS_SMTP_HOST=mail.yourco.example
+ARGUS_SMTP_PORT=587
+ARGUS_SMTP_USER=drills@yourco.example
+ARGUS_SMTP_PASS=••••••
+ARGUS_SMTP_FROM=it-servicedesk@yourco.example
+ARGUS_SMTP_FROM_NAME=IT Service Desk</pre>
+      <div class="prov-row">
+        <span class="src-name">SMS / WhatsApp (Twilio)</span>
+        <span>
+          {% if delivery_status.sms %}<span class="risk Low sm">SMS</span>{% endif %}
+          {% if delivery_status.whatsapp %}<span class="risk Low sm">WhatsApp</span>{% endif %}
+          {% if not delivery_status.sms and not delivery_status.whatsapp %}<span class="muted">not set</span>{% endif %}
+        </span>
+      </div>
+      <pre class="envblock">ARGUS_TWILIO_SID=AC...
+ARGUS_TWILIO_TOKEN=••••••
+ARGUS_TWILIO_FROM=+1XXXXXXXXXX        # SMS sender
+ARGUS_TWILIO_WA_FROM=+1XXXXXXXXXX     # WhatsApp sender</pre>
+      <p class="card-sub">WhatsApp only delivers Meta-approved templates, so lure content is usually rejected — treat it as best-effort. Voice and social channels are not auto-sent.</p>
+    </div>
+  </div>
+
+  <aside class="detail-side">
+    <div class="card">
+      <h3>Run an update</h3>
+      <div class="kv"><span>Status</span><b>{{ 'Enabled' if ti_enabled else 'Offline (off)' }}</b></div>
+      <div class="kv"><span>Last update</span><b class="mono">{{ last_update or 'never' }}</b></div>
+      <div class="kv"><span>Feed records</span><b class="mono">{{ feed_count }}</b></div>
+      <form method="post" action="{{ url_for('threatintel_update') }}" style="margin-top:10px">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button class="btn {{ 'primary' if ti_enabled else '' }}" type="submit" {{ 'disabled' if not ti_enabled }}>Update feed now</button>
+      </form>
+      {% if not ti_enabled %}<p class="muted" style="font-size:11.5px;margin-top:6px">Enable updates above to fetch online, or import a feed file below.</p>{% endif %}
+    </div>
+    <div class="card">
+      <h3>Air-gapped import</h3>
+      <p class="card-sub">No internet on this box? Run <span class="mono">feedsync.py</span> on a connected machine and import the file it produces.</p>
+      <form method="post" action="{{ url_for('threatintel_import') }}" enctype="multipart/form-data" class="upload-form">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <input type="file" name="file" accept=".json" required>
+        <button class="btn" type="submit">Import feed file</button>
+      </form>
+    </div>
+  </aside>
+</div>
+
+{% endblock %}

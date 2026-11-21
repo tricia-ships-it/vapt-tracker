@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Scan comparison · Argus{% endblock %}
+{% block body %}
+
+{% macro diff_row(r) %}
+<a class="diff-item" href="{{ url_for('finding_detail', fid=r.id) }}">
+  <span class="risk {{ r.actual_risk_classification or 'Information' }} sm">{{ r.actual_risk_classification or '—' }}</span>
+  <span class="diff-vuln">{{ r.vulnerability|truncate(70) }}<span class="muted mono diff-host">{{ r.ip_hostname }}</span></span>
+</a>
+{% endmacro %}
+
+<h1>Scan comparison</h1>
+<p class="lede">What changed between two assessments — new findings, resolved findings, and ones still recurring. Finding identity is matched on host + CVE (or vulnerability).</p>
+
+<form class="toolbar" method="get">
+  <label class="muted" style="font-size:12px">Baseline
+    <select name="base">
+      {% for s in scans %}<option value="{{ s.id }}" {{ 'selected' if prev and prev.id==s.id }}>{{ s.name or ('Scan #' ~ s.id) }} · {{ s.scan_date or s.imported_at[:10] }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="muted" style="font-size:12px">Compared with
+    <select name="target">
+      {% for s in scans %}<option value="{{ s.id }}" {{ 'selected' if latest and latest.id==s.id }}>{{ s.name or ('Scan #' ~ s.id) }} · {{ s.scan_date or s.imported_at[:10] }}</option>{% endfor %}
+    </select>
+  </label>
+  <button class="btn" type="submit">Compare</button>
+</form>
+
+{% if not result %}
+<div class="empty">
+  <h3>Need two scans to compare</h3>
+  <p>Import or run at least two assessments and this view will show quarter-over-quarter movement automatically.</p>
+</div>
+{% else %}
+
+<div class="stats" title="Click to show only that set">
+  <div class="stat clickable active" data-dfilter="all"><div class="n count" data-count="{{ (result.new|length) + (result.resolved|length) + (result.recurring|length) }}">{{ (result.new|length) + (result.resolved|length) + (result.recurring|length) }}</div><div class="l">All changes</div></div>
+  <div class="stat clickable" data-dfilter="new" style="--accent: var(--high)"><div class="n count" data-count="{{ result.new|length }}">{{ result.new|length }}</div><div class="l">New findings</div></div>
+  <div class="stat clickable" data-dfilter="resolved" style="--accent: var(--low)"><div class="n count" data-count="{{ result.resolved|length }}">{{ result.resolved|length }}</div><div class="l">Resolved since baseline</div></div>
+  <div class="stat clickable" data-dfilter="recurring"><div class="n count" data-count="{{ result.recurring|length }}">{{ result.recurring|length }}</div><div class="l">Still recurring</div></div>
+</div>
+
+<div class="diff-grid" id="diffGrid" data-filter="all">
+  <div class="card diff-col new">
+    <h3><span class="diff-dot new"></span>New <span class="count-badge">{{ result.new|length }}</span></h3>
+    <div class="card-sub">Present now, not in the baseline</div>
+    {% for r in result.new %}{{ diff_row(r) }}{% else %}<p class="muted">None — nothing new since the baseline.</p>{% endfor %}
+  </div>
+  <div class="card diff-col resolved">
+    <h3><span class="diff-dot resolved"></span>Resolved <span class="count-badge">{{ result.resolved|length }}</span></h3>
+    <div class="card-sub">In the baseline, gone now</div>
+    {% for r in result.resolved %}{{ diff_row(r) }}{% else %}<p class="muted">None resolved yet.</p>{% endfor %}
+  </div>
+  <div class="card diff-col recurring">
+    <h3><span class="diff-dot recurring"></span>Recurring <span class="count-badge">{{ result.recurring|length }}</span></h3>
+    <div class="card-sub">Present in both</div>
+    {% for r in result.recurring %}{{ diff_row(r) }}{% else %}<p class="muted">None carried over.</p>{% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('.stat[data-dfilter]').forEach(function (t) {
+  t.addEventListener('click', function () {
+    var grid = document.getElementById('diffGrid');
+    if (grid) grid.setAttribute('data-filter', t.getAttribute('data-dfilter'));
+    document.querySelectorAll('.stat[data-dfilter]').forEach(function (s) {
+      s.classList.toggle('active', s === t);
+    });
+  });
+});
+</script>
+{% endblock %}

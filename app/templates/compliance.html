@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Compliance coverage · Argus{% endblock %}
+{% block body %}
+
+<h1>Compliance coverage</h1>
+<p class="lede">Which control areas the current findings touch, mapped to the frameworks you've enabled{% if frameworks %} ({{ frameworks|join(', ') }}){% endif %}. This relates findings to controls to show where open gaps sit — it is guidance for assessment, not a certification of compliance. Choose frameworks in <a href="{{ url_for('settings_page') }}">Settings</a>.</p>
+
+{% if not total %}
+<div class="empty"><h3>No findings yet</h3><p>Populate the register and control coverage appears here.</p></div>
+{% elif not frameworks %}
+<div class="empty"><h3>No frameworks enabled</h3><p>Choose the compliance frameworks relevant to your environment in <a href="{{ url_for('settings_page') }}">Settings</a> — ISO 27001, PCI DSS, NIST CSF, CIS, SOC 2, NIST 800-53, GDPR or HIPAA.</p><a class="btn primary" href="{{ url_for('settings_page') }}">Open settings</a></div>
+{% else %}
+<div class="comp-grid">
+  {% for fw in frameworks %}
+  <div class="card comp-fw">
+    <h3>{{ fw }}</h3>
+    <div class="card-sub">{{ coverage[fw]|length }} control area{{ '' if coverage[fw]|length==1 else 's' }} with findings</div>
+    {% for c in coverage[fw] %}
+    <div class="comp-row">
+      <div class="comp-ctrl">
+        <span class="comp-id">{{ c.id }}</span>
+        <span class="comp-title">{{ c.title }}</span>
+      </div>
+      <div class="comp-meter"><span class="seg {{ c.max_sev or 'Information' }}" style="width:{{ (100 * c.open / (c.count or 1))|round }}%"></span></div>
+      <div class="comp-nums">
+        <span class="risk {{ c.max_sev or 'Information' }} sm">{{ c.max_sev or '—' }}</span>
+        <span class="mono">{{ c.open }} open</span>
+        <span class="muted mono">/ {{ c.count }}</span>
+      </div>
+    </div>
+    {% else %}
+    <p class="muted">No mapped findings.</p>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+<p class="note">Mapping is keyword-based on each finding's title, description and CVE, and is intentionally conservative. A finding can touch more than one control. Use it to prioritise control areas, not as an audit result.</p>
+{% endif %}
+
+{% endblock %}

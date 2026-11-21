@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Argus{% endblock %}</title>
+  <script>
+    // Apply saved theme before paint to avoid a flash. Default: dark.
+    (function () {
+      try {
+        var t = localStorage.getItem('vapt-theme');
+        if (!t) t = 'dark';  /* dark is the product's signature; toggle persists a choice */
+        if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='argus-icon.svg') }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='argus-32.png') }}">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='argus-256.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  {% if current_user %}
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark"><b>//</b> Argus</span>
+      <span class="tag">internal · offline</span>
+    </div>
+    <nav class="topnav">
+      <a href="{{ url_for('dashboard') }}">Dashboard</a>
+      <a href="{{ url_for('index') }}">Findings</a>
+      <a href="{{ url_for('inventory') }}">Inventory</a>
+      <a href="{{ url_for('assets') }}">Assets</a>
+      <a href="{{ url_for('scan_diff') }}">Compare</a>
+      <a href="{{ url_for('compliance_view') }}">Compliance</a>
+      <a href="{{ url_for('threatintel_view') }}">Threats</a>
+      <a href="{{ url_for('phishing_view') }}">Phishing</a>
+      <a href="{{ url_for('activity_feed') }}">Activity</a>
+      {% if can_import_or_scan %}
+      <a href="{{ url_for('import_scan') }}">Import</a>
+      <a href="{{ url_for('owners') }}">Owners</a>
+      {% endif %}
+      {% if is_admin %}<a href="{{ url_for('users') }}">Users</a>{% endif %}
+      {% if is_admin %}<a href="{{ url_for('settings_page') }}">Settings</a>{% endif %}
+      {% if can_import_or_scan %}<a href="{{ url_for('finding_new') }}">+ Add</a>{% endif %}
+      {% if can_import_or_scan %}<a href="{{ url_for('scan_page') }}" class="primary">Run scan</a>{% endif %}
+    </nav>
+    <div class="usermenu">
+      <button type="button" class="kbd-chip" id="cmdkChip" title="Command palette">⌘K</button>
+      <button type="button" class="theme-toggle" id="themeToggle" title="Toggle light / dark" aria-label="Toggle light or dark theme">◐</button>
+      <span class="uname">{{ current_user.display_name or current_user.username }}</span>
+      <span class="urole">{{ role_labels.get(current_user.role, current_user.role) }}</span>
+      <a href="{{ url_for('change_password') }}" title="Change password" class="umlink">Password</a>
+      <a href="{{ url_for('logout') }}" class="umlink">Sign out</a>
+    </div>
+  </header>
+  {% endif %}
+  <main class="wrap">
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}{% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+    {% block body %}{% endblock %}
+  </main>
+  <script>
+    // Theme toggle: switch, persist, and notify charts to redraw.
+    (function () {
+      var btn = document.getElementById('themeToggle');
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        if (isLight) { document.documentElement.removeAttribute('data-theme'); save('dark'); }
+        else { document.documentElement.setAttribute('data-theme', 'light'); save('light'); }
+        window.dispatchEvent(new Event('themechange'));
+      });
+      function save(v) { try { localStorage.setItem('vapt-theme', v); } catch (e) {} }
+    })();
+  </script>
+  {% block scripts %}{% endblock %}
+  {% if current_user %}
+  <script>
+    window.__ROUTES = {
+      dashboard: "{{ url_for('dashboard') }}",
+      index: "{{ url_for('index') }}",
+      inventory: "{{ url_for('inventory') }}",
+      assets: "{{ url_for('assets') }}",
+      diff: "{{ url_for('scan_diff') }}",
+      compliance: "{{ url_for('compliance_view') }}",
+      threatintel: "{{ url_for('threatintel_view') }}",
+      phishing: "{{ url_for('phishing_view') }}",
+      activity: "{{ url_for('activity_feed') }}"{% if is_admin %},
+      settings: "{{ url_for('settings_page') }}"{% endif %}{% if can_import_or_scan %},
+      finding_new: "{{ url_for('finding_new') }}",
+      scan_page: "{{ url_for('scan_page') }}",
+      import_scan: "{{ url_for('import_scan') }}",
+      owners: "{{ url_for('owners') }}"{% endif %}{% if is_admin %},
+      users: "{{ url_for('users') }}"{% endif %}
+    };
+    window.__CAN_SCAN = {{ 'true' if can_import_or_scan else 'false' }};
+    window.__IS_ADMIN = {{ 'true' if is_admin else 'false' }};
+  </script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  {% endif %}
+</body>
+</html>

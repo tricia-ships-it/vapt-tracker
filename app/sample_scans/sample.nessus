@@ -1,0 +1,46 @@
+<?xml version="1.0" ?>
+<NessusClientData_v2>
+  <Report name="Quarterly DC Scan">
+    <ReportHost name="10.100.72.10">
+      <HostProperties>
+        <tag name="host-ip">10.100.72.10</tag>
+        <tag name="operating-system">Linux Kernel 5.4 on Ubuntu 20.04</tag>
+      </HostProperties>
+      <ReportItem port="443" svc_name="www" protocol="tcp" severity="4" pluginID="157288" pluginName="OpenSSL 3.0.x &lt; 3.0.7 Multiple Vulnerabilities">
+        <risk_factor>Critical</risk_factor>
+        <cvss3_base_score>9.8</cvss3_base_score>
+        <synopsis>The remote host is affected by multiple vulnerabilities in OpenSSL.</synopsis>
+        <description>The version of OpenSSL on the remote host is prior to 3.0.7 and is affected by a buffer overflow (CVE-2022-3602) that could lead to remote code execution.</description>
+        <solution>Upgrade to OpenSSL 3.0.7 or later.</solution>
+        <cve>CVE-2022-3602</cve>
+        <cve>CVE-2022-3786</cve>
+        <exploit_available>true</exploit_available>
+        <exploit_framework_metasploit>true</exploit_framework_metasploit>
+        <see_also>https://www.openssl.org/news/secadv/20221101.txt</see_also>
+      </ReportItem>
+      <ReportItem port="22" svc_name="ssh" protocol="tcp" severity="2" pluginID="10881" pluginName="SSH Protocol Versions Supported">
+        <risk_factor>Medium</risk_factor>
+        <cvss_base_score>5.3</cvss_base_score>
+        <synopsis>The remote service supports older SSH protocol handling.</synopsis>
+        <description>Weak key exchange algorithms are enabled on the SSH service.</description>
+        <solution>Disable weak KEX algorithms in sshd_config.</solution>
+      </ReportItem>
+    </ReportHost>
+    <ReportHost name="10.100.72.11">
+      <HostProperties>
+        <tag name="host-ip">10.100.72.11</tag>
+        <tag name="operating-system">Windows Server 2016</tag>
+      </HostProperties>
+      <ReportItem port="445" svc_name="cifs" protocol="tcp" severity="3" pluginID="97833" pluginName="MS17-010 SMBv1 Vulnerability">
+        <risk_factor>High</risk_factor>
+        <cvss3_base_score>8.1</cvss3_base_score>
+        <synopsis>The remote Windows host is affected by SMBv1 vulnerabilities.</synopsis>
+        <description>The remote host is missing the MS17-010 patch (EternalBlue). CVE-2017-0144.</description>
+        <solution>Apply the MS17-010 security update and disable SMBv1.</solution>
+        <cve>CVE-2017-0144</cve>
+        <exploit_available>true</exploit_available>
+        <exploit_framework_metasploit>true</exploit_framework_metasploit>
+      </ReportItem>
+    </ReportHost>
+  </Report>
+</NessusClientData_v2>

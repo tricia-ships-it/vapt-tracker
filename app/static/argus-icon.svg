@@ -1,0 +1,54 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2636"/>
+      <stop offset="1" stop-color="#0b0f16"/>
+    </linearGradient>
+    <linearGradient id="iris" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#78b4ff"/>
+      <stop offset="1" stop-color="#3f7fe0"/>
+    </linearGradient>
+    <radialGradient id="pupilGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#5cf0d6"/>
+      <stop offset="0.6" stop-color="#2ee6c5"/>
+      <stop offset="1" stop-color="#2ee6c5" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+  </defs>
+
+  <!-- app-icon tile -->
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bg)" stroke="#2a3542" stroke-width="2"/>
+
+  <!-- shield (the guardian) -->
+  <path d="M256 86 L384 134 V250 C384 349 318 408 256 436 C194 408 128 349 128 250 V134 Z"
+        fill="#0e1622"/>
+  <path d="M256 86 L384 134 V250 C384 349 318 408 256 436 C194 408 128 349 128 250 V134 Z"
+        fill="none" stroke="#31466a" stroke-width="4" opacity="0.9"/>
+
+  <!-- the all-seeing eye -->
+  <g>
+    <!-- lens -->
+    <path d="M150 256 C196 198, 316 198, 362 256 C316 314, 196 314, 150 256 Z"
+          fill="#0b1119" stroke="#5aa2ff" stroke-width="14" stroke-linejoin="round"/>
+    <!-- iris rings -->
+    <circle cx="256" cy="256" r="58" fill="none" stroke="url(#iris)" stroke-width="12"/>
+    <circle cx="256" cy="256" r="38" fill="none" stroke="#2d5ca8" stroke-width="6"/>
+    <!-- pupil with glow -->
+    <circle cx="256" cy="256" r="34" fill="url(#pupilGlow)" filter="url(#soft)"/>
+    <circle cx="256" cy="256" r="19" fill="#2ee6c5"/>
+    <!-- catchlight -->
+    <circle cx="247" cy="247" r="6" fill="#eafff9"/>
+    <!-- scan line -->
+    <line x1="150" y1="256" x2="362" y2="256" stroke="#2ee6c5" stroke-width="2" opacity="0.35"/>
+  </g>
+
+  <!-- aperture ticks (instrument detail) -->
+  <g stroke="#5aa2ff" stroke-width="5" stroke-linecap="round" opacity="0.85">
+    <line x1="256" y1="180" x2="256" y2="194"/>
+    <line x1="256" y1="318" x2="256" y2="332"/>
+    <line x1="180" y1="256" x2="194" y2="256"/>
+    <line x1="318" y1="256" x2="332" y2="256"/>
+  </g>
+</svg>

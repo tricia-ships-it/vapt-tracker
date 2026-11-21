@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}New campaign · Argus{% endblock %}
+{% block body %}
+
+<div class="page-head">
+  <div>
+    <h1>New phishing campaign</h1>
+    <p class="lede">Start from an awareness template, adjust the wording to fit your environment, then add recipients on the next screen. The templates use generic role framing and never impersonate a real company or person.</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn ghost" href="{{ url_for('phishing_view') }}">Cancel</a>
+  </div>
+</div>
+
+<form method="post" class="stack" id="campForm">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+
+  <div class="field">
+    <label>Choose a template</label>
+    <div class="tpl-grid">
+      {% for t in templates %}
+      <label class="tpl-card">
+        <input type="radio" name="template_key" value="{{ t.key }}" {{ 'checked' if loop.first }}>
+        <div class="tpl-body">
+          <div class="tpl-name">{{ t.name }}</div>
+          <div class="tpl-cat muted">{{ t.category }}</div>
+          <div class="tpl-subj muted">“{{ t.subject }}”</div>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="name">Campaign name</label>
+    <input type="text" id="name" name="name" placeholder="e.g. Q4 password-reset test">
+  </div>
+
+  <div class="field">
+    <label>Delivery channel</label>
+    <div class="chan-row">
+      <label class="chan"><input type="radio" name="channel" value="email" checked><span>Email <span class="muted">(SMTP)</span></span></label>
+      <label class="chan"><input type="radio" name="channel" value="sms"><span>SMS <span class="muted">(Twilio)</span></span></label>
+      <label class="chan"><input type="radio" name="channel" value="whatsapp"><span>WhatsApp <span class="muted">(limited)</span></span></label>
+      <label class="chan"><input type="radio" name="channel" value="social"><span>Social <span class="muted">(manual)</span></span></label>
+    </div>
+    <p class="hint">Email, SMS and WhatsApp send automatically from your own configured provider. Social handles are prepared for you to send by hand — Argus never auto-messages social accounts.</p>
+  </div>
+  <div class="grid-2">
+    <div class="field">
+      <label for="sender">From (display)</label>
+      <input type="text" id="sender" name="sender">
+    </div>
+    <div class="field">
+      <label for="subject">Subject line</label>
+      <input type="text" id="subject" name="subject">
+    </div>
+  </div>
+  <div class="field">
+    <label for="body">Email body <span class="muted">— use <span class="mono">{{ '{{name}}' }}</span> and <span class="mono">{{ '{{link}}' }}</span></span></label>
+    <textarea id="body" name="body" rows="12"></textarea>
+  </div>
+  <div class="field">
+    <label for="landing_note">Teachable-page note <span class="muted">(optional, shown to anyone who clicks)</span></label>
+    <textarea id="landing_note" name="landing_note" rows="3" placeholder="e.g. This was a security awareness exercise run by the InfoSec team. No action is needed."></textarea>
+  </div>
+
+  <div class="form-actions">
+    <button class="btn primary" type="submit">Create campaign →</button>
+    <span class="note" style="margin:0">You'll add recipients and get the tracking links on the next screen.</span>
+  </div>
+</form>
+
+<script id="tpldata" type="application/json">{{ templates|tojson }}</script>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var TPL = JSON.parse(document.getElementById('tpldata').textContent);
+  var byKey = {}; TPL.forEach(function (t) { byKey[t.key] = t; });
+  var f = document.getElementById('campForm');
+  function fill(key, force) {
+    var t = byKey[key]; if (!t) return;
+    // only overwrite fields the user hasn't edited (or when forced on first load)
+    ['sender', 'subject', 'body'].forEach(function (k) {
+      var el = f[k];
+      if (force || !el.dataset.touched) el.value = t[k];
+    });
+    if (force || !f.name.dataset.touched) f.name.value = t.name;
+  }
+  ['name', 'sender', 'subject', 'body'].forEach(function (k) {
+    f[k].addEventListener('input', function () { f[k].dataset.touched = '1'; });
+  });
+  f.querySelectorAll('input[name=template_key]').forEach(function (r) {
+    r.addEventListener('change', function () { if (r.checked) fill(r.value, true); });
+  });
+  var checked = f.querySelector('input[name=template_key]:checked');
+  if (checked) fill(checked.value, true);
+})();
+</script>
+{% endblock %}

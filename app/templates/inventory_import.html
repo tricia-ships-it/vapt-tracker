@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Import assets · Argus{% endblock %}
+{% block body %}
+
+<div class="crumb"><a href="{{ url_for('inventory') }}">Asset register</a> <span>/</span> <span>Import</span></div>
+<h1>Import assets</h1>
+<p class="lede">Upload an Excel (.xlsx) or CSV export of your asset inventory. Each asset is auto-classified by type and criticality, and OT gear is flagged do-not-scan for your review.</p>
+
+<div class="detail-grid">
+  <div class="detail-main">
+    <div class="card">
+      <h3>Upload a file</h3>
+      <form method="post" enctype="multipart/form-data" class="upload-form">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <input type="file" name="file" accept=".xlsx,.csv,.tsv" required>
+        <button class="btn primary" type="submit">Import &amp; classify</button>
+      </form>
+      <p class="muted" style="margin-top:10px">Nothing leaves this machine. The file is parsed locally and the assets added to your register.</p>
+    </div>
+  </div>
+  <aside class="detail-side">
+    <div class="card">
+      <h3>Expected columns</h3>
+      <p class="card-sub">Headers are matched flexibly (case-insensitive)</p>
+      <div class="kv"><span>IP Address</span><b class="mono">required*</b></div>
+      <div class="kv"><span>Hostname</span><b class="mono">required*</b></div>
+      <div class="kv"><span>Description</span><b class="mono">optional</b></div>
+      <div class="kv"><span>Criticality</span><b class="mono">optional</b></div>
+      <div class="kv"><span>Type</span><b class="mono">optional</b></div>
+      <div class="kv"><span>Owner</span><b class="mono">optional</b></div>
+      <p class="muted" style="font-size:11.5px;margin-top:8px">*At least one of IP or Hostname. Leave Type blank and the tool infers it (OT, IoT, Network, BYOD, IT) from the name/description.</p>
+      <a class="btn ghost" href="{{ url_for('inventory_template') }}" style="margin-top:6px">Download template</a>
+    </div>
+  </aside>
+</div>
+
+{% endblock %}

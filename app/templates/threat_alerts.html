@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Threat intel · Argus{% endblock %}
+{% block body %}
+
+<div class="page-head">
+  <div>
+    <h1>Threat intelligence</h1>
+    <p class="lede">Public vulnerability feeds matched against your findings and asset inventory — locally. Actively-exploited (CISA KEV) issues that touch your estate are raised first.</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn ghost" href="{{ url_for('settings_page') }}">Feed settings</a>
+  </div>
+</div>
+
+{% if not feed_count %}
+<div class="empty">
+  <h3>No threat feed loaded yet</h3>
+  <p>Load a feed to start matching. Either enable online updates in <a href="{{ url_for('settings_page') }}">Settings</a> and run an update, or import a feed file produced by <span class="mono">feedsync.py</span> on a connected machine. Matching happens entirely on this box — nothing about your assets is sent anywhere.</p>
+  <a class="btn primary" href="{{ url_for('settings_page') }}">Go to feed settings</a>
+</div>
+{% else %}
+<div class="stats" title="Click to filter the alerts">
+  <div class="stat clickable active" data-tfilter="all"><div class="n count" data-count="{{ alerts|length }}">{{ alerts|length }}</div><div class="l">Matched alerts</div></div>
+  <div class="stat clickable breach" data-tfilter="kev"><div class="n count" data-count="{{ kev_count }}">{{ kev_count }}</div><div class="l">Actively exploited (KEV)</div></div>
+  <div class="stat"><div class="n count" data-count="{{ feed_count }}">{{ feed_count }}</div><div class="l">Feed records loaded</div></div>
+</div>
+
+{% if not alerts %}
+<div class="note">Good news — none of the {{ feed_count }} feed records currently match your findings or asset inventory. Re-check after your next scan or feed update.</div>
+{% else %}
+<div class="alert-list">
+  {% for a in alerts %}
+  <div class="alert-card {{ 'kev' if a.kev }}" data-kev="{{ 1 if a.kev else 0 }}">
+    <div class="alert-top">
+      <div class="alert-id">
+        {% if a.kev %}<span class="kev-badge">⚠ Actively exploited</span>{% endif %}
+        <span class="mono cve">{{ a.cve or '—' }}</span>
+        <span class="risk {{ a.severity or 'Medium' }} sm">{{ a.severity }}</span>
+        <span class="muted src">{{ a.source }}</span>
+      </div>
+      {% if a.date %}<span class="muted mono alert-date">{{ a.date[:10] }}</span>{% endif %}
+    </div>
+    {% if a.title %}<div class="alert-title">{{ a.title }}</div>{% endif %}
+    <div class="alert-reason">{{ a.reason }}</div>
+    {% if a.hosts or a.asset_hosts %}
+    <div class="alert-hosts">
+      <span class="muted">Affects:</span>
+      {% for h in a.hosts %}<span class="host-chip mono">{{ h }}</span>{% endfor %}
+      {% for h in a.asset_hosts %}<span class="host-chip mono">{{ h }}</span>{% endfor %}
+    </div>
+    {% endif %}
+    {% if a.finding_ids %}
+    <div class="alert-links">
+      {% for fid in a.finding_ids %}<a class="btn sm ghost" href="{{ url_for('finding_detail', fid=fid) }}">Open finding #{{ fid }}</a>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.alert-card'));
+  function apply(f) {
+    cards.forEach(function (c) {
+      c.style.display = (f === 'all' || (f === 'kev' && c.dataset.kev === '1')) ? '' : 'none';
+    });
+  }
+  document.querySelectorAll('.stat[data-tfilter]').forEach(function (t) {
+    t.addEventListener('click', function () {
+      document.querySelectorAll('.stat[data-tfilter]').forEach(function (s) { s.classList.toggle('active', s === t); });
+      apply(t.getAttribute('data-tfilter'));
+    });
+  });
+})();
+</script>
+{% endblock %}

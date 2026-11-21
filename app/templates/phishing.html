@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Phishing awareness · Argus{% endblock %}
+{% block body %}
+
+<div class="page-head">
+  <div>
+    <h1>Phishing awareness</h1>
+    <p class="lede">Run simulated phishing exercises against your own staff, measure who clicks, and turn every click into a teachable moment. No real credentials are ever collected — the link leads to a short lesson, not a login page.</p>
+  </div>
+  <div class="head-actions">
+    {% if can_import_or_scan %}<a class="btn primary" href="{{ url_for('phishing_new') }}">+ New campaign</a>{% endif %}
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="n count" data-count="{{ prog.campaigns }}">{{ prog.campaigns }}</div><div class="l">Campaigns</div></div>
+  <div class="stat"><div class="n count" data-count="{{ prog.recipients }}">{{ prog.recipients }}</div><div class="l">Recipients</div></div>
+  <div class="stat breach"><div class="n count" data-count="{{ prog.clicked }}">{{ prog.clicked }}</div><div class="l">Clicked ({{ prog.click_rate }}%)</div></div>
+  <div class="stat" style="--accent:var(--low)"><div class="n count" data-count="{{ prog.reported }}">{{ prog.reported }}</div><div class="l">Recognised &amp; reported</div></div>
+</div>
+
+{% if not campaigns %}
+<div class="empty">
+  <h3>No campaigns yet</h3>
+  <p>Create a campaign from one of the built-in awareness templates. Argus generates a unique, opaque tracking link per recipient; you send the emails from your own authorised mail relay. Clicks are recorded here and each one shows the recipient what they missed.</p>
+  {% if can_import_or_scan %}<a class="btn primary" href="{{ url_for('phishing_new') }}">Create your first campaign</a>
+  {% else %}<p class="note">Ask an editor or admin to create a campaign.</p>{% endif %}
+</div>
+{% else %}
+<div class="table-scroll">
+<table class="grid">
+  <thead>
+    <tr>
+      <th>Campaign</th>
+      <th>Template</th>
+      <th>Status</th>
+      <th>Recipients</th>
+      <th>Clicked</th>
+      <th>Click rate</th>
+      <th>Reported</th>
+      <th>Created</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in campaigns %}
+    <tr class="rowlink" onclick="location.href='{{ url_for('phishing_campaign', cid=c.id) }}'">
+      <td class="vuln">{{ c.name }}</td>
+      <td class="muted">{{ c.template_key }}</td>
+      <td class="nowrap">
+        {% if c.status == 'Active' %}<span class="risk High sm">Active</span>
+        {% elif c.status == 'Closed' %}<span class="risk Low sm">Closed</span>
+        {% else %}<span class="risk Information sm">Draft</span>{% endif %}
+      </td>
+      <td class="mono">{{ c.stats.recipients }}</td>
+      <td class="mono">{{ c.stats.clicked }}</td>
+      <td class="nowrap">
+        <div class="ratebar" title="{{ c.stats.click_rate }}% clicked">
+          <span style="width:{{ c.stats.click_rate }}%"></span>
+        </div>
+        <span class="mono muted" style="font-size:11px">{{ c.stats.click_rate }}%</span>
+      </td>
+      <td class="mono">{{ c.stats.reported }}</td>
+      <td class="mono nowrap muted">{{ c.created_at[:10] if c.created_at }}</td>
+      <td class="nowrap"><a class="btn sm ghost" href="{{ url_for('phishing_campaign', cid=c.id) }}">Open</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="note">Click rate is the share of recipients who followed the link. A lower rate over successive campaigns is the signal you want. "Reported" counts people who recognised the simulation and used the teachable page's report action.</p>
+{% endif %}
+
+{% endblock %}

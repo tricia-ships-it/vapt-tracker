@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Asset register · Argus{% endblock %}
+{% block body %}
+
+<div class="page-head">
+  <div>
+    <h1>Asset register</h1>
+    <p class="lede">The canonical list of assets, their criticality and type, and whether they may be actively scanned. Operational-technology assets are protected from active scanning by default.</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn ghost" href="{{ url_for('inventory_template') }}">Download template</a>
+    <a class="btn primary" href="{{ url_for('inventory_import') }}">Import assets</a>
+  </div>
+</div>
+
+<div class="stats" title="Click to filter the table">
+  <div class="stat clickable active" data-ifilter="all"><div class="n count" data-count="{{ counts.total }}">{{ counts.total }}</div><div class="l">Assets</div></div>
+  <div class="stat clickable" data-ifilter="ot"><div class="n count" data-count="{{ counts.ot }}">{{ counts.ot }}</div><div class="l">OT assets</div></div>
+  <div class="stat clickable" data-ifilter="noscan" style="--accent:var(--med)"><div class="n count" data-count="{{ counts.do_not_scan }}">{{ counts.do_not_scan }}</div><div class="l">Do-not-scan (protected)</div></div>
+  <div class="stat clickable overdue" data-ifilter="never"><div class="n count" data-count="{{ counts.never_assessed }}">{{ counts.never_assessed }}</div><div class="l">Never assessed</div></div>
+  <div class="stat clickable" data-ifilter="review"><div class="n count" data-count="{{ counts.unclassified }}">{{ counts.unclassified }}</div><div class="l">Need review</div></div>
+</div>
+
+{% if not assets %}
+<div class="empty">
+  <h3>No assets yet</h3>
+  <p>Import your asset sheet (Excel or CSV) to build the register. Download the template to see the expected columns — the tool auto-classifies each asset and flags OT gear as do-not-scan for you to confirm.</p>
+  <a class="btn primary" href="{{ url_for('inventory_import') }}">Import assets</a>
+</div>
+{% else %}
+<div class="note" style="margin-bottom:12px">OT / industrial-control assets are marked <b>Do not actively scan</b> — the scanner will inventory them passively but never actively probe them. Change the type to adjust the policy. Personal / BYOD assets need an authoriser before they are scanned.</div>
+<div class="table-scroll"><table class="grid inv">
+  <thead><tr>
+    <th>IP</th><th>Hostname</th><th>Description</th><th>Criticality</th><th>Type</th>
+    <th>Scan policy</th><th>Authorised by</th><th>Assessed</th><th></th><th></th>
+  </tr></thead>
+  <tbody>
+  {% for a in assets %}
+  <tr class="{{ 'row-noscan' if not a.scan_eligible }} {{ 'row-never' if not a.assessed }}"
+      data-type="{{ a.asset_type }}" data-eligible="{{ 1 if a.scan_eligible else 0 }}"
+      data-assessed="{{ 1 if a.assessed else 0 }}"
+      data-review="{{ 1 if (not a.criticality or a.asset_type == 'Unknown') else 0 }}">
+    <td class="mono">{{ a.ip or '—' }}</td>
+    <td class="mono">{{ a.hostname or '—' }}</td>
+    <td class="desc">{{ a.description or '' }}</td>
+    <td><select name="criticality" form="e{{ a.id }}" class="mini">
+      <option value="">—</option>
+      {% for c in crits %}<option value="{{ c }}" {{ 'selected' if a.criticality==c }}>{{ c }}</option>{% endfor %}
+    </select></td>
+    <td><select name="asset_type" form="e{{ a.id }}" class="mini">
+      {% for t in types %}<option value="{{ t }}" {{ 'selected' if a.asset_type==t }}>{{ t }}</option>{% endfor %}
+    </select></td>
+    <td class="nowrap">
+      {% if not a.scan_eligible %}<span class="pol noscan">⛔ {{ a.scan_policy }}</span>
+      {% elif 'caution' in a.scan_policy or 'authorisation' in a.scan_policy or 'Review' in a.scan_policy %}<span class="pol caution">{{ a.scan_policy }}</span>
+      {% else %}<span class="pol ok">{{ a.scan_policy }}</span>{% endif %}
+    </td>
+    <td><input type="text" name="authorized_by" form="e{{ a.id }}" class="mini" value="{{ a.authorized_by or '' }}" placeholder="—"
+        {% if a.authorized_at %}title="Authorised {{ a.authorized_at[:10] }}"{% endif %}></td>
+    <td class="nowrap">{% if a.assessed %}<span class="pill-ok">Yes</span>{% else %}<span class="pill-warn">Never</span>{% endif %}</td>
+    <td class="nowrap"><button class="btn sm" type="submit" form="e{{ a.id }}">Save</button></td>
+    <td class="nowrap"><button class="btn sm ghost" type="submit" form="d{{ a.id }}" title="Remove">✕</button></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+
+{# form elements associated with the row controls via the HTML5 form= attribute #}
+<div hidden>
+  {% for a in assets %}
+  <form id="e{{ a.id }}" method="post" action="{{ url_for('inventory_edit', aid=a.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"></form>
+  <form id="d{{ a.id }}" method="post" action="{{ url_for('inventory_delete', aid=a.id) }}" onsubmit="return confirm('Remove this asset?')"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"></form>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var rows = Array.prototype.slice.call(document.querySelectorAll('table.inv tbody tr'));
+  function apply(f) {
+    rows.forEach(function (r) {
+      var show = f === 'all'
+        || (f === 'ot' && r.dataset.type === 'OT')
+        || (f === 'noscan' && r.dataset.eligible === '0')
+        || (f === 'never' && r.dataset.assessed === '0')
+        || (f === 'review' && r.dataset.review === '1');
+      r.style.display = show ? '' : 'none';
+    });
+  }
+  document.querySelectorAll('.stat[data-ifilter]').forEach(function (t) {
+    t.addEventListener('click', function () {
+      document.querySelectorAll('.stat[data-ifilter]').forEach(function (s) { s.classList.toggle('active', s === t); });
+      apply(t.getAttribute('data-ifilter'));
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Security awareness</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='argus-icon.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    body { display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; }
+    .land { max-width: 640px; width: 100%; }
+    .land .card { padding: 30px 30px 26px; }
+    .land-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 600;
+      font-size: 13px; letter-spacing: .02em; color: var(--high);
+      background: color-mix(in srgb, var(--high) 14%, transparent);
+      border: 1px solid color-mix(in srgb, var(--high) 40%, transparent);
+      padding: 6px 12px; border-radius: 999px; }
+    .land h1 { font-size: 26px; margin: 16px 0 8px; }
+    .land p.sub { color: var(--ink-dim); margin: 0 0 20px; line-height: 1.55; }
+    .land ul { margin: 0; padding: 0; list-style: none; }
+    .land ul li { position: relative; padding: 12px 0 12px 30px; border-top: 1px solid var(--line);
+      line-height: 1.5; font-size: 14.5px; }
+    .land ul li:before { content: "!"; position: absolute; left: 0; top: 11px;
+      width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px;
+      font-weight: 700; font-size: 12px; color: #fff; background: var(--high); }
+    .land .note-box { margin-top: 20px; padding: 14px 16px; border-radius: 10px;
+      background: var(--panel-2, rgba(127,127,127,.08)); font-size: 14px; line-height: 1.5; }
+    .land .foot { margin-top: 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .land .safe { font-size: 12.5px; color: var(--ink-dim); margin-top: 22px; line-height: 1.5; }
+    .reported-ok { color: var(--met, #35b37e); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="land">
+    <div class="card">
+      {% if known and active %}
+      <span class="land-badge">⚠ This was a simulated phishing test</span>
+      <h1>You clicked a simulated phishing link</h1>
+      <p class="sub">No harm done, and nothing was installed or collected — this exercise was run by your own security team to help everyone practise spotting real attacks. Had this been a genuine phishing email, clicking could have exposed your account or your organisation. Here's what gave it away:</p>
+      {% else %}
+      <span class="land-badge">Security awareness</span>
+      <h1>Spot the phish</h1>
+      <p class="sub">This is a security-awareness training link. Below are the kinds of warning signs to look for in suspicious emails.</p>
+      {% endif %}
+
+      {% if flags %}
+      <ul>
+        {% for f in flags %}<li>{{ f }}</li>{% endfor %}
+      </ul>
+      {% else %}
+      <ul>
+        <li>Check the sender's real email address, not just the display name.</li>
+        <li>Be wary of urgency, threats, or deadlines pushing you to act fast.</li>
+        <li>Hover over links to see where they really go before clicking.</li>
+        <li>When in doubt, report it to your security team and don't click.</li>
+      </ul>
+      {% endif %}
+
+      {% if note %}
+      <div class="note-box">{{ note }}</div>
+      {% endif %}
+
+      <div class="foot">
+        {% if known and active %}
+          {% if reported %}
+          <span class="reported-ok">✓ Thanks — you've marked this as reported.</span>
+          {% else %}
+          <a class="btn primary" href="{{ url_for('phish_reported', token=token) }}">I recognise this — report it</a>
+          <span class="safe" style="margin:0">In a real attack, reporting is exactly the right move.</span>
+          {% endif %}
+        {% endif %}
+      </div>
+
+      <p class="safe">This page is part of a security-awareness exercise. It does not ask for your password or any personal information, and it never will. If you're ever unsure whether a message is genuine, contact your IT or security team directly.</p>
+    </div>
+  </div>
+</body>
+</html>

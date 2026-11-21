@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Asset inventory · Argus{% endblock %}
+{% block body %}
+
+<h1>Asset inventory</h1>
+<p class="lede">Every assessed host, ranked by its highest open risk — a per-asset view of exposure, ownership and remediation load across {{ total_hosts }} host{{ '' if total_hosts==1 else 's' }}.</p>
+
+{% if not hosts %}
+<div class="empty"><h3>No assets yet</h3><p>Run or import a scan to build the inventory.</p></div>
+{% else %}
+<div class="asset-grid">
+  {% for h in hosts %}
+  <a class="asset-card sev-{{ h.max_sev }}" href="{{ url_for('index') }}?q={{ h.ip }}">
+    <div class="asset-top">
+      <div>
+        <div class="asset-ip mono">{{ h.ip }}</div>
+        {% if h.device %}<div class="asset-dev muted mono">{{ h.device }}</div>{% endif %}
+      </div>
+      <span class="risk {{ h.max_sev or 'Information' }}">{{ h.max_sev or '—' }}</span>
+    </div>
+    <div class="asset-bar">
+      {% for sev in ['Critical','High','Medium','Low','Information'] %}
+        {% if h.sev[sev] %}<span class="seg {{ sev }}" style="flex:{{ h.sev[sev] }}" title="{{ sev }}: {{ h.sev[sev] }}"></span>{% endif %}
+      {% endfor %}
+    </div>
+    <div class="asset-stats">
+      <span><b>{{ h.total }}</b> findings</span>
+      <span><b>{{ h.open }}</b> open</span>
+      {% if h.exposed %}<span class="warn"><b>{{ h.exposed }}</b> exposed</span>{% endif %}
+      {% if h.breached %}<span class="danger"><b>{{ h.breached }}</b> breached</span>{% endif %}
+    </div>
+    {% if h.owners %}<div class="asset-owners">{% for o in h.owners %}<span class="owner-pill">{{ o }}</span>{% endfor %}</div>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}
